@@ -1,0 +1,15 @@
+.env
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.ruff_cache/
+.pytest_cache/
+.mypy_cache/
+tea_shop.db
+*.db
+.idea/
+.vscode/
+*.log

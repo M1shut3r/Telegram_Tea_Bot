@@ -1,0 +1,25 @@
+[project]
+name = "telegram-tea-bot"
+version = "0.1.0"
+requires-python = ">=3.11"
+readme = "README.md"
+
+[tool.ruff]
+target-version = "py311"
+line-length = 120
+src = ["app"]
+exclude = [".venv", "venv"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
+ignore = ["SIM105"]
+
+[tool.ruff.lint.per-file-ignores]
+"app/models/*.py" = ["F821"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["app"]
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
