@@ -15,6 +15,6 @@ jobs:
       - name: Install Ruff
         run: pip install ruff==0.12.11
       - name: Run Ruff
-        run: ruff check app
+        run: ruff check app api
       - name: Check formatting
-        run: ruff format --check app
+        run: ruff format --check app api

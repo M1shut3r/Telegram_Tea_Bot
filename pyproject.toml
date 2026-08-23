@@ -7,8 +7,8 @@ readme = "README.md"
 [tool.ruff]
 target-version = "py311"
 line-length = 120
-src = ["app"]
-exclude = [".venv", "venv"]
+src = ["app", "api"]
+exclude = [".venv", "venv", "frontend", "node_modules"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B", "SIM", "ASYNC"]
@@ -18,7 +18,7 @@ ignore = ["SIM105"]
 "app/models/*.py" = ["F821"]
 
 [tool.ruff.lint.isort]
-known-first-party = ["app"]
+known-first-party = ["app", "api"]
 
 [tool.ruff.format]
 quote-style = "double"
