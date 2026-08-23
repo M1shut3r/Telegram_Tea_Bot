@@ -59,7 +59,10 @@ def orders_keyboard(
     page = max(0, min(page, total_pages - 1))
     builder = InlineKeyboardBuilder()
     for order in orders:
-        label = archive_order_label(order) if kind == ORDER_LIST_ARCHIVED else f"Заказ #{order.id} — {status_title(order.status)}"
+        if kind == ORDER_LIST_ARCHIVED:
+            label = archive_order_label(order)
+        else:
+            label = f"Заказ #{order.id} — {status_title(order.status)}"
         builder.button(
             text=label,
             callback_data=f"adm:show:{kind}:{page}:{order.id}",
