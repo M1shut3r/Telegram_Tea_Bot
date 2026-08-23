@@ -10,6 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.handlers.start import send_home
 from app.keyboards.admin_kb import (
+    ORDER_LIST_ACTIVE,
+    ORDER_LIST_ARCHIVED,
     ORDERS_PAGE_SIZE,
     admin_panel_keyboard,
     order_details_keyboard,
@@ -21,6 +23,7 @@ from app.models.user import User, UserRole
 from app.repositories.orders import OrderRepository
 from app.repositories.products import ProductRepository
 from app.services.admin_manager import HasRole
+from app.services.order_management import OrderNotCancellableError, OrderNotFoundError, cancel_order
 from app.services.order_tracking import user_status_notification
 from app.services.ordering import build_order_message
 
@@ -35,6 +38,10 @@ class ProductCreate(StatesGroup):
     description = State()
     composition = State()
     price = State()
+
+
+class AdminStates(StatesGroup):
+    waiting_for_tracking = State()
 
 
 @router.message(StateFilter(default_state), F.text == ADMIN_PANEL_BUTTON)
@@ -151,31 +158,53 @@ async def handle_product_price(
     await send_home(message, staff_user, f"Товар «{product.name}» добавлен в каталог.")
 
 
-@router.callback_query(F.data.startswith("adm:orders:"))
+@router.callback_query(F.data.startswith("adm:list:"))
 async def handle_orders_list(callback: CallbackQuery, session: AsyncSession) -> None:
     if callback.message is None or callback.data is None:
         await callback.answer()
         return
-    page = int(callback.data.split(":")[2])
+    parts = callback.data.split(":")
+    if len(parts) != 4:
+        await callback.answer()
+        return
+    kind = parts[2]
+    page = int(parts[3])
+    if kind not in {ORDER_LIST_ACTIVE, ORDER_LIST_ARCHIVED}:
+        await callback.answer()
+        return
     repository = OrderRepository(session)
-    total = await repository.count_all()
-    orders = await repository.list_recent(page * ORDERS_PAGE_SIZE, ORDERS_PAGE_SIZE)
+    if kind == ORDER_LIST_ACTIVE:
+        total = await repository.count_active()
+        orders = await repository.get_active_orders(page * ORDERS_PAGE_SIZE, ORDERS_PAGE_SIZE)
+        title = f"🟢 Активные заказы ({total}):"
+        empty = "Активных заказов пока нет."
+    else:
+        total = await repository.count_archived()
+        orders = await repository.get_archived_orders(page * ORDERS_PAGE_SIZE, ORDERS_PAGE_SIZE)
+        title = f"🏁 Завершенные и отмененные ({total}):"
+        empty = "Завершённых заказов пока нет."
     await callback.answer()
     if total == 0:
-        await callback.message.edit_text("Заказов пока нет.", reply_markup=admin_panel_keyboard())
+        await callback.message.edit_text(empty, reply_markup=admin_panel_keyboard())
         return
     await callback.message.edit_text(
-        f"Заказы ({total}):",
-        reply_markup=orders_keyboard(orders, page, total),
+        title,
+        reply_markup=orders_keyboard(orders, page, total, kind),
     )
 
 
-@router.callback_query(F.data.startswith("adm:order:"))
+@router.callback_query(F.data.startswith("adm:show:"))
 async def handle_order_details(callback: CallbackQuery, session: AsyncSession) -> None:
     if callback.message is None or callback.data is None:
         await callback.answer()
         return
-    order_id = int(callback.data.split(":")[2])
+    parts = callback.data.split(":")
+    if len(parts) != 5:
+        await callback.answer()
+        return
+    kind = parts[2]
+    page = int(parts[3])
+    order_id = int(parts[4])
     order = await OrderRepository(session).get_with_items(order_id)
     if order is None:
         await callback.answer("Заказ не найден.", show_alert=True)
@@ -183,7 +212,7 @@ async def handle_order_details(callback: CallbackQuery, session: AsyncSession) -
     await callback.answer()
     await callback.message.edit_text(
         build_order_message(order, f"<b>Заказ #{order.id}</b>"),
-        reply_markup=order_details_keyboard(order),
+        reply_markup=order_details_keyboard(order, page=page, kind=kind),
     )
 
 
@@ -197,15 +226,18 @@ async def handle_order_status(
     callback: CallbackQuery,
     session: AsyncSession,
     bot: Bot,
+    state: FSMContext,
 ) -> None:
     await callback.answer()
     if callback.message is None or callback.data is None:
         return
     parts = callback.data.split(":")
-    if len(parts) != 4:
+    if len(parts) != 6:
         return
-    order_id = int(parts[2])
-    new_status = parts[3]
+    kind = parts[2]
+    page = int(parts[3])
+    order_id = int(parts[4])
+    new_status = parts[5]
     allowed = {
         OrderStatus.IN_PROGRESS.value,
         OrderStatus.PACKED.value,
@@ -214,6 +246,23 @@ async def handle_order_status(
     }
     if new_status not in allowed:
         return
+    if new_status == OrderStatus.SHIPPED.value:
+        order = await OrderRepository(session).get_with_items(order_id)
+        if order is None:
+            return
+        await state.set_state(AdminStates.waiting_for_tracking)
+        await state.update_data(
+            order_id=order_id,
+            order_chat_id=callback.message.chat.id,
+            order_message_id=callback.message.message_id,
+            order_kind=kind,
+            order_page=page,
+        )
+        await callback.message.answer(
+            "Введите трек-номер для отправки",
+            reply_markup=cancel_menu(),
+        )
+        return
     repository = OrderRepository(session)
     order = await repository.update_status(order_id, new_status)
     if order is None:
@@ -221,7 +270,7 @@ async def handle_order_status(
     try:
         await callback.message.edit_text(
             build_order_message(order, f"<b>Заказ #{order.id}</b>"),
-            reply_markup=order_details_keyboard(order),
+            reply_markup=order_details_keyboard(order, page=page, kind=kind),
         )
     except TelegramBadRequest:
         pass
@@ -230,7 +279,101 @@ async def handle_order_status(
     try:
         await bot.send_message(
             order.user.telegram_id,
-            user_status_notification(order.id, order.status),
+            user_status_notification(order.id, order.status, order.tracking_number),
+        )
+    except TelegramAPIError:
+        return
+
+
+@router.callback_query(F.data.startswith("adm:cnl:"))
+async def handle_admin_cancel_order(
+    callback: CallbackQuery,
+    session: AsyncSession,
+    bot: Bot,
+) -> None:
+    if callback.message is None or callback.data is None:
+        await callback.answer()
+        return
+    parts = callback.data.split(":")
+    if len(parts) != 5:
+        await callback.answer()
+        return
+    kind = parts[2]
+    page = int(parts[3])
+    order_id = int(parts[4])
+    try:
+        order = await cancel_order(session, bot, order_id, "admin")
+    except OrderNotFoundError:
+        await callback.answer("Заказ не найден.", show_alert=True)
+        return
+    except OrderNotCancellableError:
+        await callback.answer("Этот заказ уже нельзя отменить.", show_alert=True)
+        return
+    await callback.answer("Заказ отменён.")
+    try:
+        await callback.message.edit_text(
+            build_order_message(order, f"<b>Заказ #{order.id}</b>"),
+            reply_markup=order_details_keyboard(order, page=page, kind=kind),
+        )
+    except TelegramBadRequest:
+        return
+
+
+@router.message(AdminStates.waiting_for_tracking, F.text == CANCEL_BUTTON)
+async def handle_tracking_cancel(
+    message: Message,
+    state: FSMContext,
+    staff_user: User,
+) -> None:
+    await state.clear()
+    await send_home(message, staff_user, "Отправка без трек-номера отменена.")
+
+
+@router.message(AdminStates.waiting_for_tracking, F.text)
+async def handle_tracking_number(
+    message: Message,
+    session: AsyncSession,
+    bot: Bot,
+    state: FSMContext,
+    staff_user: User,
+) -> None:
+    tracking_number = (message.text or "").strip()
+    if len(tracking_number) < 4:
+        await message.answer("Введите трек-номер для отправки")
+        return
+    data = await state.get_data()
+    order_id = int(data.get("order_id", 0))
+    if order_id <= 0:
+        await state.clear()
+        await send_home(message, staff_user, "Заказ не найден.")
+        return
+    repository = OrderRepository(session)
+    order = await repository.set_shipped(order_id, tracking_number)
+    chat_id = data.get("order_chat_id")
+    message_id = data.get("order_message_id")
+    kind = str(data.get("order_kind") or ORDER_LIST_ACTIVE)
+    page = int(data.get("order_page") or 0)
+    await state.clear()
+    if order is None:
+        await send_home(message, staff_user, "Заказ не найден.")
+        return
+    if chat_id is not None and message_id is not None:
+        try:
+            await bot.edit_message_text(
+                build_order_message(order, f"<b>Заказ #{order.id}</b>"),
+                chat_id=int(chat_id),
+                message_id=int(message_id),
+                reply_markup=order_details_keyboard(order, page=page, kind=kind),
+            )
+        except TelegramBadRequest:
+            pass
+    await send_home(message, staff_user, f"Заказ #{order.id} отправлен. Трек-номер: {tracking_number}")
+    if order.user is None:
+        return
+    try:
+        await bot.send_message(
+            order.user.telegram_id,
+            user_status_notification(order.id, order.status, order.tracking_number),
         )
     except TelegramAPIError:
         return
