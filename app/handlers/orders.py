@@ -84,10 +84,7 @@ async def handle_user_cancel_order(
         await callback.answer("Этот заказ уже нельзя отменить.", show_alert=True)
         return
     await callback.answer("Заказ отменён.")
-    text = (
-        f"📦 Статус заказа №{cancelled.id}\n\n"
-        f"{generate_roadmap_text(cancelled.status, cancelled.tracking_number)}"
-    )
+    text = f"📦 Статус заказа №{cancelled.id}\n\n{generate_roadmap_text(cancelled.status, cancelled.tracking_number)}"
     try:
         await callback.message.edit_text(text, reply_markup=order_roadmap_keyboard(cancelled))
     except TelegramBadRequest:
@@ -106,10 +103,7 @@ async def handle_order_roadmap(callback: CallbackQuery, session: AsyncSession, b
     order = await OrderRepository(session).get_for_user(order_id, user.id)
     if order is None:
         return
-    text = (
-        f"📦 Статус заказа №{order.id}\n\n"
-        f"{generate_roadmap_text(order.status, order.tracking_number)}"
-    )
+    text = f"📦 Статус заказа №{order.id}\n\n{generate_roadmap_text(order.status, order.tracking_number)}"
     try:
         await callback.message.edit_text(text, reply_markup=order_roadmap_keyboard(order))
     except TelegramBadRequest:
