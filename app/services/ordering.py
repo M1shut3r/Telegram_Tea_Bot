@@ -12,7 +12,7 @@ from app.repositories.carts import CartRepository
 from app.repositories.orders import OrderRepository
 from app.repositories.users import UserRepository
 from app.services.cart_lifecycle import cancel_cart_jobs
-from app.services.order_tracking import status_title
+from app.services.order_tracking import status_title, tracking_line
 
 
 class EmptyCartError(Exception):
@@ -41,9 +41,11 @@ def build_order_message(order: Order, title: str | None = None) -> str:
         f"Страна: {escape(order.country or '—')}",
         f"Город: {escape(order.city or '—')}",
         f"Адрес: {escape(order.address)}",
-        "",
-        "<b>Состав заказа:</b>",
     ]
+    track = tracking_line(order.tracking_number)
+    if track is not None:
+        lines.append(escape(track))
+    lines.extend(["", "<b>Состав заказа:</b>"])
     for item in order.items:
         product_name = escape(item.product.name) if item.product is not None else f"#{item.product_id}"
         line_total = format_price(item.price_at_purchase * item.quantity)
