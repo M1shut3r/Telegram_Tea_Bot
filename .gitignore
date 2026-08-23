@@ -9,7 +9,12 @@ __pycache__/
 .pytest_cache/
 .mypy_cache/
 tea_shop.db
+tea_shop.db-wal
+tea_shop.db-shm
 *.db
+*.db-wal
+*.db-shm
+data/
 .idea/
 .vscode/
 *.log

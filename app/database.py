@@ -14,7 +14,12 @@ class Base(DeclarativeBase):
     pass
 
 
-engine = create_async_engine(settings.database_url, echo=False)
+engine = create_async_engine(
+    settings.database_url,
+    echo=False,
+    connect_args={"timeout": 30},
+    pool_pre_ping=True,
+)
 async_session_factory = async_sessionmaker(
     bind=engine,
     class_=AsyncSession,
@@ -37,6 +42,11 @@ async def init_db() -> None:
     from app.models import AdminInvite, Cart, Order, OrderItem, Product, User
 
     _ = (User, Product, Cart, Order, OrderItem, AdminInvite)
+    async with engine.connect() as connection:
+        await connection.execute(text("PRAGMA journal_mode=WAL"))
+        await connection.execute(text("PRAGMA busy_timeout=8000"))
+        await connection.execute(text("PRAGMA synchronous=NORMAL"))
+        await connection.commit()
     async with engine.begin() as connection:
         await connection.run_sync(Base.metadata.create_all)
         await _add_missing_order_columns(connection)
