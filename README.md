@@ -126,8 +126,8 @@ Telegram opens Mini Apps only over **HTTPS with a valid certificate**. `http://l
 
 Two ways to raise the site:
 
-1. **Windows / local test** — FastAPI on port 8000 + Cloudflare Tunnel (quick HTTPS URL).
-2. **Production** — your domain, nginx (or similar), Let's Encrypt, then the same FastAPI process.
+1. **Ubuntu VPS (рекомендуется)** — полный гайд ниже: [Развёртывание на Ubuntu](#развёртывание-на-ubuntu-чистый-сервер). Бот и сайт крутятся в `screen`.
+2. **Windows / локальный тест** — FastAPI на порту 8000 + Cloudflare Tunnel.
 
 ### 1. Build the frontend
 
@@ -219,43 +219,6 @@ On startup the bot also calls `set_chat_menu_button`, so a **Витрина** bu
 
 Then in the bot chat send `/start` so the reply keyboard refreshes. Open the storefront from **Витрина** or **Открыть витрину**, not by pasting the Cloudflare link into a normal browser. A regular browser has no Telegram `initData`; the catalog can still load, but cart and checkout need a real Mini App session.
 
-### 5. Production domain
-
-On a server with a real certificate you do not need a tunnel.
-
-1. Point `shop.example.com` at the machine.
-2. Build the frontend on the server (`cd frontend && npm ci && npm run build`).
-3. Run `python -m app.bot` (or the systemd unit below). FastAPI listens on `127.0.0.1:8000` if you set `WEBAPP_HOST=127.0.0.1`.
-4. Reverse-proxy with TLS. Example nginx:
-
-```nginx
-server {
-    listen 443 ssl;
-    server_name shop.example.com;
-
-    ssl_certificate     /etc/letsencrypt/live/shop.example.com/fullchain.pem;
-    ssl_certificate_key /etc/letsencrypt/live/shop.example.com/privkey.pem;
-
-    location / {
-        proxy_pass http://127.0.0.1:8000;
-        proxy_set_header Host $host;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-}
-```
-
-5. `.env`:
-
-```env
-WEBAPP_URL=https://shop.example.com/webapp/
-WEBAPP_HOST=127.0.0.1
-WEBAPP_PORT=8000
-WEBAPP_SERVE=true
-```
-
-6. Put the same `https://shop.example.com/webapp/` into BotFather **Menu Button** and **Main App**. Domain: `shop.example.com`.
-
 ### API routes
 
 | Method | Path | Auth |
@@ -292,90 +255,349 @@ ruff format app api
 
 CI runs the same checks on every push and pull request.
 
-## Server install (Ubuntu)
+## Развёртывание на Ubuntu (чистый сервер)
 
-### 1. System packages
+Гайд для **пустого** Ubuntu 22.04 или 24.04: на машине ещё нет Python-проекта, Node, бота и сайта.
+
+Итог: два окна `screen`, которые переживают закрытие SSH.
+
+| Screen | Имя | Что делает |
+| --- | --- | --- |
+| 1 | `tea-bot` | Telegram-бот + сайт Mini App (FastAPI на порту 8000) |
+| 2 | `tea-site` | Публичный HTTPS: Cloudflare Tunnel до `127.0.0.1:8000` |
+
+Один процесс `python -m app.bot` при `WEBAPP_SERVE=true` поднимает и бота, и сайт. Второй screen только открывает этот сайт в интернет — Telegram не умеет `http://` и не ходит на голый IP.
+
+Если есть свой домен — туннель не нужен, см. [вариант со своим доменом](#17-вариант-свой-домен-вместо-туннеля).
+
+### 0. Что нужно до входа на сервер
+
+1. VPS с Ubuntu и SSH-доступом (логин вроде `ubuntu` или `root`).
+2. Бот в [@BotFather](https://t.me/BotFather): скопируйте токен.
+3. Канал: добавьте бота администратором с правом видеть участников.
+4. Числовой ID канала (`-100…`) и свой Telegram ID (`SUPER_ADMIN_ID`, например через `@userinfobot`).
+
+Дальше все команды — **на сервере**, в SSH.
+
+### 1. Подключиться по SSH
+
+С своего компьютера:
+
+```bash
+ssh ubuntu@IP_СЕРВЕРА
+```
+
+Подставьте свой логин и IP. Если зашли как `root`, `sudo` в командах ниже можно не писать.
+
+### 2. Обновить систему
 
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-venv python3-pip git nginx certbot python3-certbot-nginx
+sudo apt upgrade -y
+```
+
+Если установщик спросит про перезапуск служб — подтвердите. После большого обновления ядра лучше перезагрузить сервер и зайти по SSH снова:
+
+```bash
+sudo reboot
+```
+
+### 3. Поставить базовые пакеты
+
+```bash
+sudo apt install -y python3 python3-venv python3-pip git curl ca-certificates screen ufw
 python3 --version
 ```
 
-Install Node.js 20+ for the Mini App build (NodeSource or the distro package). Then, after the clone and venv steps, build the UI:
+Нужен Python **3.11 или новее**. На Ubuntu 22.04 и 24.04 он уже есть.
+
+### 4. Поставить Node.js 20 (сборка витрины)
+
+Пакет `nodejs` из Ubuntu 22.04 слишком старый. Ставим 20.x:
 
 ```bash
-sudo -u teabot -H bash -lc 'cd /opt/tea-bot/frontend && npm ci && npm run build'
+curl -fsSL https://deb.nodesource.com/setup_20.x | sudo -E bash -
+sudo apt install -y nodejs
+node --version
+npm --version
 ```
 
-Python 3.11+ is required. Ubuntu 22.04 already has it.
+`node` должен показать `v20…`.
 
-### 2. Service user
+### 5. Поставить cloudflared (HTTPS для Mini App)
 
 ```bash
-sudo adduser --system --group --home /opt/tea-bot teabot
-sudo mkdir -p /opt/tea-bot
-sudo chown teabot:teabot /opt/tea-bot
+curl -L --output /tmp/cloudflared.deb https://github.com/cloudflare/cloudflared/releases/latest/download/cloudflared-linux-amd64.deb
+sudo dpkg -i /tmp/cloudflared.deb
+cloudflared --version
 ```
 
-Clone the repository into `/opt/tea-bot`, then:
+На ARM-сервере (Oracle Ampere и т.п.) вместо `amd64` скачайте `cloudflared-linux-arm64.deb`.
+
+### 6. Скачать проект
 
 ```bash
-sudo -u teabot -H bash -lc 'cd /opt/tea-bot && python3 -m venv .venv && .venv/bin/pip install --upgrade pip && .venv/bin/pip install -r requirements.txt'
+cd ~
+git clone https://github.com/M1shut3r/Telegram_Tea_Bot.git
+cd ~/Telegram_Tea_Bot
 ```
 
-### 3. Secrets
+Дальше все пути — из этой папки.
+
+### 7. Python-окружение и зависимости
 
 ```bash
-sudo -u teabot cp /opt/tea-bot/Example.env /opt/tea-bot/.env
-sudo -u teabot nano /opt/tea-bot/.env
-sudo chmod 600 /opt/tea-bot/.env
+cd ~/Telegram_Tea_Bot
+python3 -m venv .venv
+source .venv/bin/activate
+python -m pip install --upgrade pip
+pip install -r requirements.txt
 ```
 
-### 4. systemd unit
+В начале строки должно появиться `(.venv)`. Активируйте venv **каждый раз**, когда заново заходите в `tea-bot`:
 
-Create `/etc/systemd/system/tea-bot.service`:
+```bash
+cd ~/Telegram_Tea_Bot
+source .venv/bin/activate
+```
 
-```ini
-[Unit]
-Description=Tea shop Telegram bot
-After=network-online.target
-Wants=network-online.target
+### 8. Собрать сайт (React → `frontend/dist`)
 
-[Service]
-Type=simple
-User=teabot
-Group=teabot
-WorkingDirectory=/opt/tea-bot
-Environment=PYTHONUNBUFFERED=1
-ExecStart=/opt/tea-bot/.venv/bin/python -m app.bot
-Restart=always
-RestartSec=5
+```bash
+cd ~/Telegram_Tea_Bot/frontend
+npm ci
+npm run build
+cd ~/Telegram_Tea_Bot
+```
 
-[Install]
-WantedBy=multi-user.target
+Без этой папки FastAPI отдаст «Mini App не собран». После правок в `frontend/src` снова выполните `npm run build`.
+
+### 9. Файл `.env`
+
+```bash
+cd ~/Telegram_Tea_Bot
+cp Example.env .env
+nano .env
+```
+
+Заполните так (пока без `WEBAPP_URL` — его даст туннель на шаге 13):
+
+```env
+BOT_TOKEN=123456:ABC-DEF
+SUPER_ADMIN_ID=123456789
+CHANNEL_ID=-1001234567890
+WEBAPP_URL=
+WEBAPP_HOST=127.0.0.1
+WEBAPP_PORT=8000
+WEBAPP_SERVE=true
+WEBAPP_DEBUG=false
+```
+
+Сохранить в nano: `Ctrl+O`, Enter, выйти: `Ctrl+X`.
+
+```bash
+chmod 600 .env
+```
+
+### 10. Файрвол
+
+Открываем только SSH. Сайт снаружи идёт через туннель, порт 8000 в интернет не публикуем.
+
+```bash
+sudo ufw allow OpenSSH
+sudo ufw --force enable
+sudo ufw status
+```
+
+### 11. Как пользоваться screen
+
+| Действие | Клавиши / команда |
+| --- | --- |
+| Создать сессию | `screen -S имя` |
+| Отсоединиться и оставить процесс | `Ctrl+A`, потом `D` |
+| Список сессий | `screen -ls` |
+| Вернуться | `screen -r имя` |
+| Остановить программу внутри | `Ctrl+C` |
+| Убить сессию целиком | `screen -S имя -X quit` |
+
+Не закрывайте SSH крестиком, пока не отсоединились через `Ctrl+A`, `D` — иначе процесс внутри screen тоже умрёт, если сессия не была detached.
+
+### 12. Screen `tea-bot` — бот и сайт
+
+```bash
+screen -S tea-bot
+cd ~/Telegram_Tea_Bot
+source .venv/bin/activate
+python -m app.bot
+```
+
+В логе должны быть polling и Uvicorn на `127.0.0.1:8000`. Отсоединитесь: **`Ctrl+A`, затем `D`**. Вы снова в обычном SSH, бот продолжает работать.
+
+Проверка, что сессия жива:
+
+```bash
+screen -ls
+```
+
+Должна быть строка с `tea-bot`.
+
+### 13. Screen `tea-site` — публикация сайта
+
+```bash
+screen -S tea-site
+cloudflared tunnel --url http://127.0.0.1:8000 --protocol http2
+```
+
+Дождитесь блока:
+
+```text
+Your quick Tunnel has been created! Visit it at:
+https://случайные-слова.trycloudflare.com
+```
+
+Скопируйте `https://….trycloudflare.com` **без** пути в конце. Отсоединитесь: **`Ctrl+A`, затем `D`**. Это окно нельзя «убивать»: новый запуск cloudflared выдаёт **другой** хост.
+
+Если видите `Failed to dial a quic connection` — команда с `--protocol http2` уже правильная. Если туннель сразу падает, проверьте, что `tea-bot` запущен и отвечает:
+
+```bash
+curl -I http://127.0.0.1:8000/webapp/
+```
+
+Ожидается `200` или `304`.
+
+### 14. Прописать адрес витрины и перезапустить бота
+
+```bash
+nano ~/Telegram_Tea_Bot/.env
+```
+
+Подставьте свой хост туннеля:
+
+```env
+WEBAPP_URL=https://случайные-слова.trycloudflare.com/webapp/
+```
+
+Слеш в конце `/webapp/` обязателен.
+
+Перезапуск только бота (туннель не трогайте):
+
+```bash
+screen -r tea-bot
+```
+
+`Ctrl+C`, затем снова:
+
+```bash
+source .venv/bin/activate
+python -m app.bot
+```
+
+`Ctrl+A`, `D`.
+
+### 15. BotFather
+
+Полный URL, схема только `https://`:
+
+```text
+https://случайные-слова.trycloudflare.com/webapp/
+```
+
+1. [@BotFather](https://t.me/BotFather) → `/mybots` → ваш бот → **Bot Settings**.
+2. **Menu Button** — название `Витрина`, URL как выше.
+3. **Main App** — тот же URL.
+4. Поле **Domain** — только хост, без `https://` и без пути: `случайные-слова.trycloudflare.com`.
+
+В чате с ботом отправьте `/start`. Витрину открывайте кнопками **Витрина** или **Открыть витрину**, не вставкой ссылки в обычный браузер: там нет `initData`, корзина не заработает.
+
+### 16. Повседневные команды
+
+Посмотреть, что запущено:
+
+```bash
+screen -ls
+```
+
+Логи бота / сайта:
+
+```bash
+screen -r tea-bot
+```
+
+Логи туннеля:
+
+```bash
+screen -r tea-site
+```
+
+Выход обратно в SSH: `Ctrl+A`, `D`.
+
+Обновить код с GitHub (база `tea_shop.db` не удаляется):
+
+```bash
+cd ~/Telegram_Tea_Bot
+git pull
+source .venv/bin/activate
+pip install -r requirements.txt
+cd frontend
+npm ci
+npm run build
+cd ..
+screen -r tea-bot
+```
+
+Внутри `tea-bot`: `Ctrl+C`, затем `python -m app.bot`, потом `Ctrl+A`, `D`.
+
+Screen `tea-site` после `git pull` не перезапускайте, если хост туннеля тот же.
+
+После перезагрузки VPS screen-сессии пропадут. Зайдите по SSH и повторите шаги 12–13 (и 14, если cloudflared выдал новый хост — тогда обновите `.env` и BotFather).
+
+### 17. Вариант: свой домен вместо туннеля
+
+Если A-запись `shop.example.com` смотрит на IP сервера, туннель не нужен. Screen `tea-site` не создавайте.
+
+```bash
+sudo apt install -y nginx certbot python3-certbot-nginx
+sudo ufw allow 'Nginx Full'
+```
+
+В `.env`:
+
+```env
+WEBAPP_URL=https://shop.example.com/webapp/
+WEBAPP_HOST=127.0.0.1
+WEBAPP_PORT=8000
+WEBAPP_SERVE=true
+```
+
+Сайт по-прежнему в screen `tea-bot` (`python -m app.bot`). Nginx только проксирует 443 → 8000.
+
+`/etc/nginx/sites-available/tea-bot`:
+
+```nginx
+server {
+    listen 80;
+    server_name shop.example.com;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
+}
 ```
 
 ```bash
-sudo systemctl daemon-reload
-sudo systemctl enable --now tea-bot
-sudo systemctl status tea-bot
-sudo journalctl -u tea-bot -f
+sudo ln -s /etc/nginx/sites-available/tea-bot /etc/nginx/sites-enabled/tea-bot
+sudo nginx -t
+sudo systemctl reload nginx
+sudo certbot --nginx -d shop.example.com
 ```
 
-Run a single polling process per token. The reminder scheduler and, when `WEBAPP_SERVE=true`, the Mini App API live in the same process. Put the public `https://…/webapp/` URL in `.env` and in BotFather after nginx has a certificate.
-
-### 5. Updates
-
-```bash
-cd /opt/tea-bot
-sudo -u teabot git pull
-sudo -u teabot /opt/tea-bot/.venv/bin/pip install -r requirements.txt
-sudo -u teabot -H bash -lc 'cd /opt/tea-bot/frontend && npm ci && npm run build'
-sudo systemctl restart tea-bot
-```
-
-Keep `tea_shop.db`. It stores users, products, and orders.
+В BotFather: URL `https://shop.example.com/webapp/`, Domain `shop.example.com`. Перезапустите `tea-bot` после правки `.env`.
 
 ## Project layout
 
