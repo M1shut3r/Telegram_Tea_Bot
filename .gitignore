@@ -13,3 +13,5 @@ tea_shop.db
 .idea/
 .vscode/
 *.log
+node_modules/
+frontend/dist/
