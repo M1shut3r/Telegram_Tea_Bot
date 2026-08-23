@@ -96,6 +96,7 @@ WEBAPP_HOST=0.0.0.0
 WEBAPP_PORT=8000
 WEBAPP_SERVE=true
 WEBAPP_DEBUG=false
+LOG_LEVEL=critical
 ```
 
 - `BOT_TOKEN` — token from BotFather.
@@ -105,6 +106,7 @@ WEBAPP_DEBUG=false
 - `WEBAPP_HOST` / `WEBAPP_PORT` — where FastAPI listens. Default is `0.0.0.0:8000`.
 - `WEBAPP_SERVE` — `true` starts FastAPI inside the same process as the bot (`python -m app.bot`).
 - `WEBAPP_DEBUG` — local-only. When `true`, API requests may send `X-Debug-Telegram-Id` instead of Telegram `initData`. Keep `false` on a public tunnel.
+- `LOG_LEVEL` — `critical` hides bot and Uvicorn logs. Set `info` only when you need to debug.
 
 Settings are loaded with pydantic-settings. Secrets stay out of source code.
 
@@ -176,7 +178,7 @@ winget install --id Cloudflare.cloudflared
 Open a **second** PowerShell window. If QUIC is blocked (common on home routers), use HTTP/2:
 
 ```powershell
-cloudflared tunnel --url http://127.0.0.1:8000 --protocol http2
+cloudflared tunnel --url http://127.0.0.1:8000 --protocol http2 --loglevel fatal
 ```
 
 Wait for the box:
@@ -391,6 +393,7 @@ WEBAPP_HOST=127.0.0.1
 WEBAPP_PORT=8000
 WEBAPP_SERVE=true
 WEBAPP_DEBUG=false
+LOG_LEVEL=critical
 ```
 
 Сохранить в nano: `Ctrl+O`, Enter, выйти: `Ctrl+X`.
@@ -445,7 +448,7 @@ screen -ls
 
 ```bash
 screen -S tea-site
-cloudflared tunnel --url http://127.0.0.1:8000 --protocol http2
+cloudflared tunnel --url http://127.0.0.1:8000 --protocol http2 --loglevel fatal
 ```
 
 Дождитесь блока:

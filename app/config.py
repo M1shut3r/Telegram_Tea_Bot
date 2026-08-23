@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     webapp_port: int = 8000
     webapp_serve: bool = True
     webapp_debug: bool = False
+    log_level: str = "critical"
 
     @property
     def public_webapp_url(self) -> str | None:
