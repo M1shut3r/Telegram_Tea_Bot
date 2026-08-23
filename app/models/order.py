@@ -14,6 +14,24 @@ class OrderStatus(str, Enum):
     PACKED = "packed"
     SHIPPED = "shipped"
     DONE = "done"
+    CANCELLED = "cancelled"
+
+
+CANCELLABLE_ORDER_STATUSES = (
+    OrderStatus.NEW.value,
+    OrderStatus.IN_PROGRESS.value,
+    OrderStatus.PACKED.value,
+)
+
+ACTIVE_ORDER_STATUSES = (
+    *CANCELLABLE_ORDER_STATUSES,
+    OrderStatus.SHIPPED.value,
+)
+
+ARCHIVED_ORDER_STATUSES = (
+    OrderStatus.DONE.value,
+    OrderStatus.CANCELLED.value,
+)
 
 
 class Order(Base):
@@ -28,6 +46,7 @@ class Order(Base):
     city: Mapped[str] = mapped_column(String(128), default="")
     address: Mapped[str] = mapped_column(String(512))
     phone: Mapped[str] = mapped_column(String(64))
+    tracking_number: Mapped[str | None] = mapped_column(String(128), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped["User"] = relationship(back_populates="orders")
