@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { getErrorMessage } from '../api/client'
 import CartItem from '../components/CartItem'
+import MaisonHeader from '../components/MaisonHeader'
 import { useCart } from '../context/CartContext'
 import { formatPrice } from '../utils/format'
 
@@ -37,22 +38,15 @@ export default function Cart() {
   }
 
   return (
-    <main className="px-5 pt-8">
-      <header className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-tg-hint">Ваш выбор</p>
-        <h1 className="mt-2 font-serif text-[34px] leading-none">Корзина</h1>
-      </header>
-      {loading ? <div className="h-40 animate-pulse rounded-[28px] bg-tg-secondary" /> : null}
+    <main className="px-5 pt-6">
+      <MaisonHeader kicker="Ваш выбор" title="Корзина" />
+      {loading ? <div className="h-40 animate-pulse bg-paper-deep" /> : null}
       {!loading && items.length === 0 ? (
-        <div className="rounded-[28px] bg-tg-secondary px-5 py-10 text-center">
-          <p className="font-serif text-2xl">Пока пусто</p>
-          <p className="mt-2 text-sm text-tg-hint">Добавьте чай из витрины — корзина соберётся сама.</p>
-          <button
-            type="button"
-            onClick={() => navigate('/')}
-            className="mt-6 h-12 rounded-2xl bg-tg-button px-6 text-sm font-semibold text-tg-button-text"
-          >
-            Открыть каталог
+        <div className="maison-card px-5 py-12 text-center">
+          <p className="font-serif text-3xl">Пока пусто</p>
+          <p className="mt-3 text-sm font-light text-tg-hint">Добавьте чай из витрины — корзина соберётся сама.</p>
+          <button type="button" onClick={() => navigate('/')} className="maison-btn mx-auto mt-7 max-w-[220px]">
+            Открыть витрину
           </button>
         </div>
       ) : null}
@@ -62,16 +56,12 @@ export default function Cart() {
         ))}
       </div>
       {items.length > 0 ? (
-        <div className="mt-8 rounded-[28px] bg-tg-secondary px-5 py-5">
+        <div className="maison-card mt-8 px-5 py-6">
           <div className="flex items-end justify-between">
-            <span className="text-sm text-tg-hint">Итого</span>
-            <span className="font-serif text-3xl">{formatPrice(total)}</span>
+            <span className="maison-kicker">Итого</span>
+            <span className="font-serif text-4xl">{formatPrice(total)}</span>
           </div>
-          <button
-            type="button"
-            onClick={() => navigate('/checkout')}
-            className="mt-5 flex h-14 w-full items-center justify-center rounded-2xl bg-tg-button text-base font-semibold text-tg-button-text"
-          >
+          <button type="button" onClick={() => navigate('/checkout')} className="maison-btn mt-6">
             Оформить заказ
           </button>
         </div>

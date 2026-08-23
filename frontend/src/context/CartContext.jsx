@@ -28,7 +28,7 @@ export function CartProvider({ children }) {
 
   useEffect(() => {
     let cancelled = false
-    waitForTelegramInitData(8000)
+    waitForTelegramInitData(600)
       .then(() => {
         if (cancelled) {
           return

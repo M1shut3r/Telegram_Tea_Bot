@@ -1,6 +1,7 @@
 import WebApp from '@twa-dev/sdk'
 import { useEffect, useState } from 'react'
 import { fetchOrder, fetchOrders, getErrorMessage } from '../api/client'
+import MaisonHeader from '../components/MaisonHeader'
 import OrderDetails from './OrderDetails'
 import { formatDate, formatPrice } from '../utils/format'
 
@@ -68,31 +69,22 @@ export default function Orders() {
   }
 
   if (selected != null) {
-    return (
-      <OrderDetails
-        order={selected}
-        onBack={() => setSelected(null)}
-        onCancelled={handleCancelled}
-      />
-    )
+    return <OrderDetails order={selected} onBack={() => setSelected(null)} onCancelled={handleCancelled} />
   }
 
   return (
-    <main className="px-5 pt-8">
-      <header className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-tg-hint">История</p>
-        <h1 className="mt-2 font-serif text-[34px] leading-none">Заказы</h1>
-      </header>
+    <main className="px-5 pt-6">
+      <MaisonHeader kicker="История" title="Заказы" />
       {loading ? (
         <div className="space-y-3">
           {Array.from({ length: 3 }).map((_, index) => (
-            <div key={index} className="h-28 animate-pulse rounded-[28px] bg-tg-secondary" />
+            <div key={index} className="h-28 animate-pulse bg-paper-deep" />
           ))}
         </div>
       ) : null}
-      {error ? <p className="rounded-3xl bg-tg-secondary px-4 py-5 text-sm text-tg-hint">{error}</p> : null}
+      {error ? <p className="maison-card px-4 py-5 text-center text-sm text-tg-hint">{error}</p> : null}
       {!loading && !error && orders.length === 0 ? (
-        <p className="rounded-[28px] bg-tg-secondary px-5 py-10 text-center text-sm text-tg-hint">
+        <p className="maison-card px-5 py-12 text-center text-sm font-light text-tg-hint">
           Заказов пока нет. Первый чай — всегда особенный.
         </p>
       ) : null}
@@ -106,25 +98,23 @@ export default function Orders() {
                 openOrder(order.id)
               }
             }}
-            className="w-full rounded-[28px] bg-tg-secondary px-5 py-4 text-left"
+            className="maison-card w-full px-5 py-5 text-left"
           >
             <div className="flex items-start justify-between gap-3">
               <div>
-                <p className="font-serif text-xl">Заказ №{order.id}</p>
-                <p className="mt-1 text-xs text-tg-hint">{formatDate(order.created_at)}</p>
+                <p className="font-serif text-2xl">Заказ №{order.id}</p>
+                <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-tg-hint">{formatDate(order.created_at)}</p>
               </div>
-              <span className="rounded-full bg-tg-bg px-3 py-1 text-xs font-semibold text-tg-button">
-                {order.status === 'cancelled' ? '❌ ' : ''}
-                {order.status === 'done' ? '🏁 ' : ''}
+              <span className="border border-white/10 px-3 py-1 text-[10px] font-medium uppercase tracking-[0.16em] text-tg-hint">
                 {order.status_title}
               </span>
             </div>
-            <p className="mt-4 text-sm text-tg-hint">
+            <p className="mt-4 text-sm font-light text-tg-hint">
               {order.city}, {order.address}
             </p>
-            <p className="mt-2 font-semibold">{formatPrice(order.total_price)}</p>
+            <p className="mt-3 font-serif text-xl">{formatPrice(order.total_price)}</p>
             {order.tracking_number && (order.status === 'shipped' || order.status === 'done') ? (
-              <p className="mt-3 text-sm font-semibold">📮 Трек-номер: {order.tracking_number}</p>
+              <p className="mt-3 text-[11px] uppercase tracking-[0.14em] text-neon/80">Трек {order.tracking_number}</p>
             ) : null}
           </button>
         ))}

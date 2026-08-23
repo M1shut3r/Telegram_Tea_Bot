@@ -2,6 +2,7 @@ import WebApp from '@twa-dev/sdk'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { checkoutOrder, getErrorMessage } from '../api/client'
+import MaisonHeader from '../components/MaisonHeader'
 import { useCart } from '../context/CartContext'
 import { formatPrice } from '../utils/format'
 
@@ -88,14 +89,10 @@ export default function Checkout() {
 
   if (count === 0) {
     return (
-      <main className="px-5 pt-8">
-        <h1 className="font-serif text-[34px] leading-none">Оформление</h1>
-        <p className="mt-4 text-sm text-tg-hint">Корзина пуста. Добавьте чай, чтобы оформить заказ.</p>
-        <button
-          type="button"
-          onClick={() => navigate('/')}
-          className="mt-6 h-12 rounded-2xl bg-tg-button px-6 text-sm font-semibold text-tg-button-text"
-        >
+      <main className="px-5 pt-6">
+        <MaisonHeader kicker="Доставка" title="Оформление" />
+        <p className="text-center text-sm font-light text-tg-hint">Корзина пуста. Добавьте чай, чтобы оформить заказ.</p>
+        <button type="button" onClick={() => navigate('/')} className="maison-btn mx-auto mt-6 max-w-[220px]">
           К витрине
         </button>
       </main>
@@ -103,75 +100,65 @@ export default function Checkout() {
   }
 
   return (
-    <main className="px-5 pb-10 pt-8">
-      <header className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-tg-hint">Доставка</p>
-        <h1 className="mt-2 font-serif text-[34px] leading-none">Оформление</h1>
-        <p className="mt-3 text-sm text-tg-hint">Итого {formatPrice(total)} · {items.length} поз.</p>
-      </header>
+    <main className="px-5 pb-10 pt-6">
+      <MaisonHeader kicker="Доставка" title="Оформление">
+        Итого {formatPrice(total)} · {items.length} поз.
+      </MaisonHeader>
       <form className="space-y-4" onSubmit={handleSubmit}>
         <label className="block">
-          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-tg-hint">Имя</span>
+          <span className="maison-kicker mb-2 block">Имя</span>
           <input
             value={form.customer_name}
             onChange={updateField('customer_name')}
-            className="h-12 w-full rounded-2xl bg-tg-secondary px-4 text-base outline-none ring-tg-button focus:ring-2"
+            className="maison-field h-12 px-4"
             autoComplete="name"
           />
-          {errors.customer_name ? <span className="mt-1 block text-xs text-red-500">{errors.customer_name}</span> : null}
+          {errors.customer_name ? <span className="mt-1 block text-xs text-red-400">{errors.customer_name}</span> : null}
         </label>
         <label className="block">
-          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-tg-hint">Телефон</span>
+          <span className="maison-kicker mb-2 block">Телефон</span>
           <input
             value={form.phone}
             onChange={updateField('phone')}
-            className="h-12 w-full rounded-2xl bg-tg-secondary px-4 text-base outline-none ring-tg-button focus:ring-2"
+            className="maison-field h-12 px-4"
             inputMode="tel"
             autoComplete="tel"
             placeholder="+79991234567"
           />
-          {errors.phone ? <span className="mt-1 block text-xs text-red-500">{errors.phone}</span> : null}
+          {errors.phone ? <span className="mt-1 block text-xs text-red-400">{errors.phone}</span> : null}
         </label>
         <label className="block">
-          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-tg-hint">Страна</span>
-          <select
-            value={form.country}
-            onChange={updateField('country')}
-            className="h-12 w-full appearance-none rounded-2xl bg-tg-secondary px-4 text-base outline-none"
-          >
+          <span className="maison-kicker mb-2 block">Страна</span>
+          <select value={form.country} onChange={updateField('country')} className="maison-field h-12 appearance-none px-4">
             <option value="Россия">Россия</option>
             <option value="other" disabled>
               Другие страны недоступны
             </option>
           </select>
-          {errors.country ? <span className="mt-1 block text-xs text-red-500">{errors.country}</span> : null}
+          {errors.country ? <span className="mt-1 block text-xs text-red-400">{errors.country}</span> : null}
         </label>
         <label className="block">
-          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-tg-hint">Город</span>
+          <span className="maison-kicker mb-2 block">Город</span>
           <input
             value={form.city}
             onChange={updateField('city')}
-            className="h-12 w-full rounded-2xl bg-tg-secondary px-4 text-base outline-none ring-tg-button focus:ring-2"
+            className="maison-field h-12 px-4"
             autoComplete="address-level2"
           />
-          {errors.city ? <span className="mt-1 block text-xs text-red-500">{errors.city}</span> : null}
+          {errors.city ? <span className="mt-1 block text-xs text-red-400">{errors.city}</span> : null}
         </label>
         <label className="block">
-          <span className="mb-2 block text-xs font-semibold uppercase tracking-[0.16em] text-tg-hint">Адрес</span>
+          <span className="maison-kicker mb-2 block">Адрес</span>
           <textarea
             value={form.address}
             onChange={updateField('address')}
-            className="min-h-[96px] w-full resize-none rounded-2xl bg-tg-secondary px-4 py-3 text-base outline-none ring-tg-button focus:ring-2"
+            className="maison-field min-h-[96px] resize-none px-4 py-3"
             autoComplete="street-address"
             placeholder="Улица, дом, квартира"
           />
-          {errors.address ? <span className="mt-1 block text-xs text-red-500">{errors.address}</span> : null}
+          {errors.address ? <span className="mt-1 block text-xs text-red-400">{errors.address}</span> : null}
         </label>
-        <button
-          type="submit"
-          disabled={submitting}
-          className="h-14 w-full rounded-2xl bg-tg-button text-base font-semibold text-tg-button-text disabled:opacity-60"
-        >
+        <button type="submit" disabled={submitting} className="maison-btn">
           {submitting ? 'Отправляем…' : 'Подтвердить заказ'}
         </button>
       </form>

@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { formatPrice } from '../utils/format'
 import QuantityControl from './QuantityControl'
 
@@ -6,67 +7,81 @@ export default function ProductModal({ product, quantity, busy, onClose, onIncre
   const [broken, setBroken] = useState(false)
 
   useEffect(() => {
-    const previous = document.body.style.overflow
-    document.body.style.overflow = 'hidden'
-    return () => {
-      document.body.style.overflow = previous
+    setBroken(false)
+  }, [product?.id])
+
+  useEffect(() => {
+    if (product == null) {
+      return undefined
     }
-  }, [])
+    const scroller = document.querySelector('.tg-scroll')
+    const previousOverflow = scroller ? scroller.style.overflow : ''
+    document.body.classList.add('sheet-open')
+    if (scroller) {
+      scroller.style.overflow = 'hidden'
+    }
+    return () => {
+      document.body.classList.remove('sheet-open')
+      if (scroller) {
+        scroller.style.overflow = previousOverflow
+      }
+    }
+  }, [product])
 
   if (product == null) {
     return null
   }
 
-  return (
-    <div className="fixed inset-0 z-40 flex items-end justify-center sm:items-center">
-      <button type="button" className="absolute inset-0 bg-black/40" onClick={onClose} aria-label="Закрыть" />
-      <div className="relative max-h-[92vh] w-full max-w-lg overflow-y-auto rounded-t-[32px] bg-tg-bg px-5 pb-8 pt-4 shadow-card sm:rounded-[32px]">
-        <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-black/10" />
-        <div className="overflow-hidden rounded-[28px] bg-tg-secondary">
-          <div className="aspect-[4/5] bg-black/5">
+  return createPortal(
+    <div className="product-sheet" role="dialog" aria-modal="true" aria-labelledby="product-sheet-title">
+      <button type="button" className="product-sheet-close" onClick={onClose} aria-label="Закрыть">
+        ×
+      </button>
+      <div className="product-sheet-scroll">
+        <div className="product-sheet-inner">
+          <div className="product-sheet-photo">
             {broken ? (
-              <div className="flex h-full items-center justify-center bg-gradient-to-br from-[#d8c4a8] to-[#8f6b4a]">
-                <span className="font-serif text-6xl text-white/80">茶</span>
+              <div className="flex h-full min-h-[220px] items-center justify-center bg-paper-deep">
+                <span className="font-neon text-6xl text-neon">Ж</span>
               </div>
             ) : (
               <img
                 src={product.photo_url}
                 alt={product.name}
-                className="h-full w-full object-cover"
+                className="product-sheet-image"
                 onError={() => setBroken(true)}
               />
             )}
           </div>
-        </div>
-        <div className="mt-5 space-y-3">
-          <div className="flex items-start justify-between gap-4">
-            <h2 className="font-serif text-[28px] leading-tight">{product.name}</h2>
-            <p className="shrink-0 pt-1 text-base font-semibold">{formatPrice(product.price)}</p>
+          <div className="space-y-3 px-5 pb-4 pt-5 text-center">
+            <p className="maison-kicker">Коллекция</p>
+            <h2 id="product-sheet-title" className="font-serif text-[2rem] leading-tight">
+              {product.name}
+            </h2>
+            <p className="text-[12px] font-medium uppercase tracking-[0.2em] text-gold">{formatPrice(product.price)}</p>
+            <p className="pt-1 text-[15px] font-light leading-relaxed text-tg-hint">{product.description}</p>
+            {product.composition ? (
+              <div className="maison-card px-4 py-4 text-left">
+                <p className="maison-kicker mb-2">Состав</p>
+                <p className="text-sm font-light leading-relaxed">{product.composition}</p>
+              </div>
+            ) : null}
           </div>
-          <p className="text-[15px] leading-relaxed text-tg-hint">{product.description}</p>
-          {product.composition ? (
-            <div className="rounded-3xl bg-tg-secondary px-4 py-3">
-              <p className="mb-1 text-xs font-semibold uppercase tracking-[0.16em] text-tg-hint">Состав</p>
-              <p className="text-sm leading-relaxed">{product.composition}</p>
-            </div>
-          ) : null}
-        </div>
-        <div className="mt-6 grid grid-cols-2 gap-3">
-          <button
-            type="button"
-            onClick={onClose}
-            className="h-12 rounded-2xl bg-tg-secondary text-sm font-semibold"
-          >
-            Закрыть
-          </button>
-          <QuantityControl
-            quantity={quantity}
-            busy={busy}
-            onIncrement={() => onIncrement(product)}
-            onDecrement={() => onDecrement(product)}
-          />
+          <div className="product-sheet-actions">
+            <button type="button" onClick={onClose} className="maison-btn-ghost">
+              Закрыть
+            </button>
+            <QuantityControl
+              quantity={quantity}
+              busy={busy}
+              tall
+              onIncrement={() => onIncrement(product)}
+              onDecrement={() => onDecrement(product)}
+            />
+          </div>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   )
 }

@@ -1,33 +1,34 @@
-export default function QuantityControl({ quantity, busy, onIncrement, onDecrement }) {
+export default function QuantityControl({ quantity, busy, onIncrement, onDecrement, tall = false }) {
+  const height = tall ? 'h-[3.25rem]' : 'h-11'
+
   if (quantity <= 0) {
     return (
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onIncrement}
-        className="flex h-11 w-full items-center justify-center rounded-2xl bg-tg-button text-lg font-semibold text-tg-button-text transition active:scale-[0.98] disabled:opacity-60"
-      >
-        +
+      <button type="button" disabled={busy} onClick={onIncrement} className={`maison-btn ${height} text-[0.68rem]`}>
+        В корзину
       </button>
     )
   }
 
   return (
-    <div className="flex h-11 w-full items-center justify-between rounded-2xl bg-tg-button px-1 text-tg-button-text">
+    <div
+      className={`flex w-full items-center justify-between border border-white/10 bg-forest px-1 text-cream ${height}`}
+    >
       <button
         type="button"
         disabled={busy}
         onClick={onDecrement}
-        className="flex h-8 w-8 items-center justify-center rounded-xl bg-black/10 text-base font-semibold disabled:opacity-60"
+        className="flex h-11 w-11 items-center justify-center text-xl disabled:opacity-60"
       >
         −
       </button>
-      <span className="min-w-[1.5rem] text-center text-sm font-semibold">{quantity} шт</span>
+      <span className="min-w-[1.5rem] text-center text-[11px] font-medium uppercase tracking-[0.16em]">
+        {quantity} шт
+      </span>
       <button
         type="button"
         disabled={busy}
         onClick={onIncrement}
-        className="flex h-9 w-9 items-center justify-center rounded-xl text-lg font-semibold disabled:opacity-60"
+        className="flex h-11 w-11 items-center justify-center text-xl disabled:opacity-60"
       >
         +
       </button>

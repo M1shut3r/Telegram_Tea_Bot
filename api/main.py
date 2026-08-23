@@ -84,8 +84,8 @@ app.include_router(orders_router, prefix="/api/orders", tags=["orders"])
 
 FAVICON_SVG = (
     '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">'
-    '<rect width="32" height="32" rx="8" fill="#2f6f4e"/>'
-    '<text x="16" y="22" text-anchor="middle" font-size="16" fill="#fff">茶</text>'
+    '<rect width="32" height="32" rx="8" fill="#0b0c10"/>'
+    '<text x="16" y="22" text-anchor="middle" font-size="14" fill="#67e8c8">Ж</text>'
     "</svg>"
 )
 

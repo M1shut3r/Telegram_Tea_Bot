@@ -41,14 +41,53 @@ export function getTelegramInitData() {
   }
 }
 
-export function bootTelegram() {
-  const webApp = getTelegramWebApp()
+function syncViewportHeight(webApp) {
+  const height = webApp.viewportStableHeight || webApp.viewportHeight || window.innerHeight
+  if (height) {
+    document.documentElement.style.setProperty('--app-height', `${height}px`)
+  }
+}
+
+function applyFullsize(webApp) {
   if (typeof webApp.ready === 'function') {
     webApp.ready()
+  }
+  if (webApp.isFullscreen === true && typeof webApp.exitFullscreen === 'function') {
+    try {
+      webApp.exitFullscreen()
+    } catch {
+      syncViewportHeight(webApp)
+    }
   }
   if (typeof webApp.expand === 'function') {
     webApp.expand()
   }
+  if (typeof webApp.disableVerticalSwipes === 'function') {
+    webApp.disableVerticalSwipes()
+  }
+  syncViewportHeight(webApp)
+}
+
+export function bootTelegram() {
+  const webApp = getTelegramWebApp()
+  applyFullsize(webApp)
+  if (typeof webApp.setHeaderColor === 'function') {
+    webApp.setHeaderColor('#0b0c10')
+  }
+  if (typeof webApp.setBackgroundColor === 'function') {
+    webApp.setBackgroundColor('#0b0c10')
+  }
+  if (typeof webApp.setBottomBarColor === 'function') {
+    webApp.setBottomBarColor('#0b0c10')
+  }
+  if (typeof webApp.onEvent === 'function') {
+    webApp.onEvent('viewportChanged', () => applyFullsize(webApp))
+    webApp.onEvent('fullscreenChanged', () => applyFullsize(webApp))
+  }
+  window.addEventListener('resize', () => syncViewportHeight(webApp))
+  ;[80, 250, 700].forEach((delay) => {
+    window.setTimeout(() => applyFullsize(webApp), delay)
+  })
   getTelegramInitData()
   return webApp
 }

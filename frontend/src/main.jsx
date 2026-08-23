@@ -4,21 +4,16 @@ import { BrowserRouter } from 'react-router-dom'
 import App from './App'
 import { CartProvider } from './context/CartContext'
 import './styles/index.css'
-import { bootTelegram, waitForTelegramInitData } from './telegram'
+import { bootTelegram } from './telegram'
 
 bootTelegram()
 
-async function bootstrap() {
-  await waitForTelegramInitData(8000)
-  ReactDOM.createRoot(document.getElementById('root')).render(
-    <React.StrictMode>
-      <BrowserRouter basename="/webapp">
-        <CartProvider>
-          <App />
-        </CartProvider>
-      </BrowserRouter>
-    </React.StrictMode>,
-  )
-}
-
-bootstrap()
+ReactDOM.createRoot(document.getElementById('root')).render(
+  <React.StrictMode>
+    <BrowserRouter basename="/webapp">
+      <CartProvider>
+        <App />
+      </CartProvider>
+    </BrowserRouter>
+  </React.StrictMode>,
+)

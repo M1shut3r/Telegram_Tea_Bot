@@ -1,10 +1,11 @@
-import WebApp from '@twa-dev/sdk'
 import { useEffect, useState } from 'react'
 import { fetchProducts, getErrorMessage } from '../api/client'
 import { getTelegramInitData } from '../telegram'
+import MaisonHeader from '../components/MaisonHeader'
 import ProductCard from '../components/ProductCard'
 import ProductModal from '../components/ProductModal'
 import { useCart } from '../context/CartContext'
+import WebApp from '@twa-dev/sdk'
 
 export default function Catalog() {
   const { add, setQuantity, items } = useCart()
@@ -69,24 +70,20 @@ export default function Catalog() {
   }
 
   return (
-    <main className="px-5 pt-8">
-      <header className="mb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.22em] text-tg-hint">Tea atelier</p>
-        <h1 className="mt-2 font-serif text-[34px] leading-none">Витрина</h1>
-        <p className="mt-3 max-w-xs text-sm leading-relaxed text-tg-hint">
-          Коллекция чая. Крупные лоты, спокойный выбор, без лишнего.
-        </p>
-      </header>
+    <main className="px-5 pt-6">
+      <MaisonHeader kicker="Чайная" title="Витрина">
+        Ночная витрина. Выбирайте спокойно.
+      </MaisonHeader>
       {loading ? (
         <div className="grid grid-cols-2 gap-3">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-72 animate-pulse rounded-[28px] bg-tg-secondary" />
+            <div key={index} className="h-80 animate-pulse bg-paper-deep" />
           ))}
         </div>
       ) : null}
-      {error ? <p className="rounded-3xl bg-tg-secondary px-4 py-5 text-sm text-tg-hint">{error}</p> : null}
+      {error ? <p className="maison-card px-4 py-5 text-center text-sm text-tg-hint">{error}</p> : null}
       {!loading && !error && products.length === 0 ? (
-        <p className="rounded-3xl bg-tg-secondary px-4 py-8 text-center text-sm text-tg-hint">
+        <p className="maison-card px-4 py-10 text-center text-sm font-light text-tg-hint">
           Каталог пока пуст. Загляните позже.
         </p>
       ) : null}
