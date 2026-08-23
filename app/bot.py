@@ -52,6 +52,9 @@ async def main() -> None:
                 port=settings.webapp_port,
                 log_level="info",
                 loop="asyncio",
+                timeout_keep_alive=75,
+                timeout_graceful_shutdown=15,
+                limit_concurrency=200,
             )
             server = uvicorn.Server(config)
             server.install_signal_handlers = False

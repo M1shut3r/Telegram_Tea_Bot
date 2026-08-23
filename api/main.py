@@ -2,6 +2,7 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from contextlib import asynccontextmanager
 from pathlib import Path
 
+import httpx
 from aiogram import Bot
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
@@ -55,6 +56,11 @@ class TelegramAuthMiddleware(BaseHTTPMiddleware):
 @asynccontextmanager
 async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await init_db()
+    app.state.http = httpx.AsyncClient(
+        timeout=12.0,
+        follow_redirects=True,
+        limits=httpx.Limits(max_connections=40, max_keepalive_connections=20),
+    )
     owns_bot = getattr(app.state, "bot", None) is None
     if owns_bot:
         app.state.bot = Bot(token=settings.bot_token, parse_mode="HTML")
@@ -63,6 +69,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     try:
         yield
     finally:
+        await app.state.http.aclose()
         if owns_bot:
             await app.state.bot.session.close()
             if cart_scheduler.running:
