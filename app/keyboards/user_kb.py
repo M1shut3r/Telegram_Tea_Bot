@@ -5,11 +5,13 @@ from aiogram.types import (
     InlineKeyboardMarkup,
     KeyboardButton,
     ReplyKeyboardMarkup,
+    WebAppInfo,
 )
 from aiogram.utils.keyboard import InlineKeyboardBuilder, ReplyKeyboardBuilder
 
+from app.config import settings
 from app.models.cart import Cart
-from app.models.order import Order
+from app.models.order import CANCELLABLE_ORDER_STATUSES, Order
 from app.models.user import UserRole
 from app.services.order_tracking import status_title
 
@@ -20,12 +22,18 @@ CONTACT_ADMIN_BUTTON = "📞 Связаться с админом"
 ADMIN_PANEL_BUTTON = "Админ-панель"
 SUPER_ADMIN_BUTTON = "Супер-админ"
 CANCEL_BUTTON = "Отмена"
+WEBAPP_BUTTON = "🍵 Открыть витрину"
 COUNTRY_RUSSIA = "Россия"
 COUNTRY_RUSSIA_CODE = "RU"
 
 
 def main_menu(role: str) -> ReplyKeyboardMarkup:
     builder = ReplyKeyboardBuilder()
+    webapp_url = settings.public_webapp_url
+    if webapp_url is not None:
+        builder.row(
+            KeyboardButton(text=WEBAPP_BUTTON, web_app=WebAppInfo(url=webapp_url)),
+        )
     builder.row(
         KeyboardButton(text=CATALOG_BUTTON),
         KeyboardButton(text=CART_BUTTON),
@@ -50,6 +58,9 @@ def subscribe_keyboard(channel_url: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Подписаться на канал", url=channel_url)
     builder.button(text="Я подписался", callback_data="sub:check")
+    webapp_url = settings.public_webapp_url
+    if webapp_url is not None:
+        builder.button(text=WEBAPP_BUTTON, web_app=WebAppInfo(url=webapp_url))
     builder.adjust(1)
     return builder.as_markup()
 
@@ -121,7 +132,10 @@ def my_orders_keyboard(orders: Sequence[Order]) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def order_roadmap_keyboard() -> InlineKeyboardMarkup:
+def order_roadmap_keyboard(order: Order) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
+    if order.status in CANCELLABLE_ORDER_STATUSES:
+        builder.button(text="❌ Отменить заказ", callback_data=f"usr:cnl:{order.id}")
     builder.button(text="К списку заказов", callback_data="usr:ords")
+    builder.adjust(1)
     return builder.as_markup()

@@ -29,6 +29,8 @@ async def _add_missing_order_columns(connection: Any) -> None:
         await connection.execute(text("ALTER TABLE orders ADD COLUMN country VARCHAR(128) DEFAULT 'Россия'"))
     if "city" not in existing:
         await connection.execute(text("ALTER TABLE orders ADD COLUMN city VARCHAR(128) DEFAULT ''"))
+    if "tracking_number" not in existing:
+        await connection.execute(text("ALTER TABLE orders ADD COLUMN tracking_number VARCHAR(128)"))
 
 
 async def init_db() -> None:

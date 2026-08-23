@@ -68,10 +68,9 @@ async def handle_start(
         }
         await message.answer(messages.get(result, messages["invalid"]))
         user = await resolve_user(session, message.from_user.id, message.from_user.username)
+    await send_home(message, user)
     if not await has_shop_access(bot, user):
         await send_subscribe_gate(message, bot)
-        return
-    await send_home(message, user)
 
 
 @router.message(StateFilter(default_state), F.text == CONTACT_ADMIN_BUTTON)
@@ -103,3 +102,14 @@ async def handle_subscription_check(
         return
     await callback.answer("Доступ открыт.")
     await callback.message.answer("Спасибо за подписку!", reply_markup=main_menu(user.role))
+
+
+@router.message(F.web_app_data)
+async def handle_web_app_data(message: Message, session: AsyncSession, bot: Bot) -> None:
+    if message.from_user is None or message.web_app_data is None:
+        return
+    user = await resolve_user(session, message.from_user.id, message.from_user.username)
+    if not await has_shop_access(bot, user):
+        await send_subscribe_gate(message, bot)
+        return
+    await send_home(message, user, "Данные витрины получены.")

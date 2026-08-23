@@ -5,7 +5,13 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.models.order import Order, OrderItem, OrderStatus
+from app.models.order import (
+    ACTIVE_ORDER_STATUSES,
+    ARCHIVED_ORDER_STATUSES,
+    Order,
+    OrderItem,
+    OrderStatus,
+)
 from app.repositories import BaseRepository
 
 
@@ -76,13 +82,50 @@ class OrderRepository(BaseRepository[Order]):
         result = await self._session.execute(statement)
         return int(result.scalar_one())
 
-    async def list_for_user(self, user_id: int, limit: int = 10) -> Sequence[Order]:
+    async def _list_by_statuses(
+        self,
+        statuses: Sequence[str],
+        offset: int,
+        limit: int,
+    ) -> Sequence[Order]:
         statement = (
             select(Order)
-            .where(Order.user_id == user_id)
+            .options(selectinload(Order.user))
+            .where(Order.status.in_(list(statuses)))
             .order_by(Order.created_at.desc(), Order.id.desc())
+            .offset(offset)
             .limit(limit)
         )
+        result = await self._session.execute(statement)
+        return result.scalars().all()
+
+    async def _count_by_statuses(self, statuses: Sequence[str]) -> int:
+        statement = select(func.count(Order.id)).where(Order.status.in_(list(statuses)))
+        result = await self._session.execute(statement)
+        return int(result.scalar_one())
+
+    async def get_active_orders(self, offset: int = 0, limit: int = 50) -> Sequence[Order]:
+        return await self._list_by_statuses(ACTIVE_ORDER_STATUSES, offset, limit)
+
+    async def get_archived_orders(self, offset: int = 0, limit: int = 50) -> Sequence[Order]:
+        return await self._list_by_statuses(ARCHIVED_ORDER_STATUSES, offset, limit)
+
+    async def count_active(self) -> int:
+        return await self._count_by_statuses(ACTIVE_ORDER_STATUSES)
+
+    async def count_archived(self) -> int:
+        return await self._count_by_statuses(ARCHIVED_ORDER_STATUSES)
+
+    async def list_for_user(
+        self,
+        user_id: int,
+        limit: int = 10,
+        statuses: Sequence[str] | None = None,
+    ) -> Sequence[Order]:
+        statement = select(Order).where(Order.user_id == user_id)
+        if statuses is not None:
+            statement = statement.where(Order.status.in_(list(statuses)))
+        statement = statement.order_by(Order.created_at.desc(), Order.id.desc()).limit(limit)
         result = await self._session.execute(statement)
         return result.scalars().all()
 
@@ -91,9 +134,24 @@ class OrderRepository(BaseRepository[Order]):
         result = await self._session.execute(statement)
         return result.scalar_one_or_none()
 
-    async def update_status(self, order_id: int, status: str) -> Order | None:
-        await self.update_by_id(order_id, status=status)
+    async def update_status(
+        self,
+        order_id: int,
+        status: str,
+        tracking_number: str | None = None,
+    ) -> Order | None:
+        values: dict[str, str] = {"status": status}
+        if tracking_number is not None:
+            values["tracking_number"] = tracking_number
+        await self.update_by_id(order_id, **values)
         return await self.get_with_items(order_id)
+
+    async def set_shipped(self, order_id: int, tracking_number: str) -> Order | None:
+        return await self.update_status(
+            order_id,
+            OrderStatus.SHIPPED.value,
+            tracking_number=tracking_number.strip(),
+        )
 
 
 class OrderItemRepository(BaseRepository[OrderItem]):

@@ -10,19 +10,23 @@ The bot covers three business jobs:
 
 Storefront access requires a subscription to the channel from `.env`. Admins and the super admin skip that check.
 
+The same shop is also a **Telegram Mini App**: a React storefront (catalog, cart, checkout, orders) served by FastAPI. The bot and the Mini App share one SQLite database and the same SQLAlchemy models. After checkout, FastAPI calls the existing `place_order` service so the customer and the admins still get Telegram messages.
+
 ## Tech stack
 
 | Layer | Tool |
 | --- | --- |
 | Telegram Bot API | aiogram 3.4.1 |
+| Mini App API | FastAPI, Uvicorn |
+| Mini App UI | React, Vite, Tailwind CSS, `@twa-dev/sdk` |
 | Database | SQLite via aiosqlite |
 | ORM | SQLAlchemy 2.0 async (`select` / `insert` / `update` / `delete`) |
 | Settings | pydantic-settings, `.env` |
 | Scheduler | APScheduler 3.10 (`AsyncIOScheduler`) |
 | Linter | Ruff |
-| Language | Python 3.11+ |
+| Language | Python 3.11+, Node.js 20+ (frontend build only) |
 
-The project uses a layered layout: handlers never talk to SQL, repositories stay free of Telegram logic, and services own sales, reminders, roles, and order tracking.
+The project uses a layered layout: handlers never talk to SQL, repositories stay free of Telegram logic, and services own sales, reminders, roles, and order tracking. FastAPI routers reuse those repositories and services.
 
 ## Local setup
 
@@ -87,15 +91,24 @@ cp Example.env .env
 BOT_TOKEN=123456:ABC-DEF
 SUPER_ADMIN_ID=123456789
 CHANNEL_ID=-1001234567890
+WEBAPP_URL=
+WEBAPP_HOST=0.0.0.0
+WEBAPP_PORT=8000
+WEBAPP_SERVE=true
+WEBAPP_DEBUG=false
 ```
 
 - `BOT_TOKEN` — token from BotFather.
 - `SUPER_ADMIN_ID` — your Telegram ID. The first `/start` from this user grants `super_admin`.
 - `CHANNEL_ID` — numeric channel ID, including the leading minus.
+- `WEBAPP_URL` — public **https** URL of the Mini App, including `/webapp/`. Leave empty until the site is reachable over HTTPS. Telegram rejects `http://` and placeholders like `yourdomain.com`.
+- `WEBAPP_HOST` / `WEBAPP_PORT` — where FastAPI listens. Default is `0.0.0.0:8000`.
+- `WEBAPP_SERVE` — `true` starts FastAPI inside the same process as the bot (`python -m app.bot`).
+- `WEBAPP_DEBUG` — local-only. When `true`, API requests may send `X-Debug-Telegram-Id` instead of Telegram `initData`. Keep `false` on a public tunnel.
 
 Settings are loaded with pydantic-settings. Secrets stay out of source code.
 
-### 5. Run
+### 5. Run the bot (chat only)
 
 From the project root with the virtualenv active:
 
@@ -105,14 +118,176 @@ python -m app.bot
 
 Write `/start` to the bot in Telegram. `tea_shop.db` is created automatically.
 
+The chat catalog and cart work without the Mini App. The reply button **Открыть витрину** appears only after `WEBAPP_URL` is a real `https://` address.
+
+## Telegram Mini App (the website)
+
+Telegram opens Mini Apps only over **HTTPS with a valid certificate**. `http://localhost:8000` cannot be used as `WEBAPP_URL` on a phone.
+
+Two ways to raise the site:
+
+1. **Windows / local test** — FastAPI on port 8000 + Cloudflare Tunnel (quick HTTPS URL).
+2. **Production** — your domain, nginx (or similar), Let's Encrypt, then the same FastAPI process.
+
+### 1. Build the frontend
+
+Install [Node.js LTS](https://nodejs.org/) (20 or newer). On Windows:
+
+```powershell
+winget install OpenJS.NodeJS.LTS
+```
+
+Close the terminal, open a new one, then:
+
+```powershell
+cd frontend
+npm install
+npm run build
+```
+
+The build writes `frontend/dist`. FastAPI serves that folder at `/webapp`. Rebuild after any change in `frontend/src`.
+
+### 2. Start the bot and the API
+
+From the project root, virtualenv active:
+
+```powershell
+python -m app.bot
+```
+
+With `WEBAPP_SERVE=true` this process also starts Uvicorn on `WEBAPP_PORT` (8000). Leave the window open.
+
+You can run the API alone:
+
+```powershell
+uvicorn api.main:app --host 0.0.0.0 --port 8000
+```
+
+### 3. Local HTTPS with Cloudflare Tunnel (Windows)
+
+Telegram will not open `localhost`. A tunnel gives a temporary `https://….trycloudflare.com` URL.
+
+Install the tunnel client:
+
+```powershell
+winget install --id Cloudflare.cloudflared
+```
+
+Open a **second** PowerShell window. If QUIC is blocked (common on home routers), use HTTP/2:
+
+```powershell
+cloudflared tunnel --url http://127.0.0.1:8000 --protocol http2
+```
+
+Wait for the box:
+
+```text
+Your quick Tunnel has been created! Visit it at:
+https://random-words.trycloudflare.com
+```
+
+That hostname is the site address. Do not close this window.
+
+If you see `Failed to dial a quic connection`, stop with `Ctrl+C` and rerun with `--protocol http2`.
+
+Put the tunnel URL into `.env` (keep the `/webapp/` suffix):
+
+```env
+WEBAPP_URL=https://random-words.trycloudflare.com/webapp/
+```
+
+Restart the bot (`Ctrl+C` in the first window, then `python -m app.bot` again). The tunnel window stays running.
+
+A new `cloudflared` process creates a **new** hostname. Update `WEBAPP_URL`, BotFather, and restart the bot every time the tunnel URL changes.
+
+### 4. BotFather
+
+`Menu Button` and `Main App` expect a **full URL**, starting with `https://`. If the field suggests `http://`, replace the whole line.
+
+Paste:
+
+```text
+https://random-words.trycloudflare.com/webapp/
+```
+
+1. [@BotFather](https://t.me/BotFather) → `/mybots` → your bot → **Bot Settings**.
+2. **Menu Button** — title `Витрина`, URL as above.
+3. **Main App** — the same URL.
+4. If you see a **Domain** field, send only the host, no scheme and no path: `random-words.trycloudflare.com`.
+
+On startup the bot also calls `set_chat_menu_button`, so a **Витрина** button appears next to the message field.
+
+Then in the bot chat send `/start` so the reply keyboard refreshes. Open the storefront from **Витрина** or **Открыть витрину**, not by pasting the Cloudflare link into a normal browser. A regular browser has no Telegram `initData`; the catalog can still load, but cart and checkout need a real Mini App session.
+
+### 5. Production domain
+
+On a server with a real certificate you do not need a tunnel.
+
+1. Point `shop.example.com` at the machine.
+2. Build the frontend on the server (`cd frontend && npm ci && npm run build`).
+3. Run `python -m app.bot` (or the systemd unit below). FastAPI listens on `127.0.0.1:8000` if you set `WEBAPP_HOST=127.0.0.1`.
+4. Reverse-proxy with TLS. Example nginx:
+
+```nginx
+server {
+    listen 443 ssl;
+    server_name shop.example.com;
+
+    ssl_certificate     /etc/letsencrypt/live/shop.example.com/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/shop.example.com/privkey.pem;
+
+    location / {
+        proxy_pass http://127.0.0.1:8000;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+```
+
+5. `.env`:
+
+```env
+WEBAPP_URL=https://shop.example.com/webapp/
+WEBAPP_HOST=127.0.0.1
+WEBAPP_PORT=8000
+WEBAPP_SERVE=true
+```
+
+6. Put the same `https://shop.example.com/webapp/` into BotFather **Menu Button** and **Main App**. Domain: `shop.example.com`.
+
+### API routes
+
+| Method | Path | Auth |
+| --- | --- | --- |
+| `GET` | `/webapp/`, `/webapp` | public (React app) |
+| `GET` | `/api/products` | public |
+| `GET` | `/api/products/{id}/photo` | public (proxies the Telegram file) |
+| `GET` | `/api/cart` | Telegram `initData` |
+| `POST` | `/api/cart/add` | Telegram `initData` |
+| `POST` | `/api/cart/quantity` | Telegram `initData` |
+| `GET` | `/api/orders` | Telegram `initData` |
+| `POST` | `/api/orders/checkout` | Telegram `initData` |
+
+Checkout writes the order through `place_order`: the cart is cleared, the customer gets «заказ принят», and every admin receives the order card.
+
+### Frontend dev server (optional)
+
+```powershell
+cd frontend
+npm run dev
+```
+
+Vite listens on `http://127.0.0.1:5173` and proxies `/api` to port 8000. Telegram still needs the HTTPS tunnel (or your domain) pointed at that stack. For day-to-day Mini App testing, prefer `npm run build` and the bot process.
+
 ## Linting
 
 Install development tools and run Ruff:
 
 ```powershell
 pip install -r requirements-dev.txt
-ruff check app
-ruff format app
+ruff check app api
+ruff format app api
 ```
 
 CI runs the same checks on every push and pull request.
@@ -123,8 +298,14 @@ CI runs the same checks on every push and pull request.
 
 ```bash
 sudo apt update
-sudo apt install -y python3 python3-venv python3-pip git
+sudo apt install -y python3 python3-venv python3-pip git nginx certbot python3-certbot-nginx
 python3 --version
+```
+
+Install Node.js 20+ for the Mini App build (NodeSource or the distro package). Then, after the clone and venv steps, build the UI:
+
+```bash
+sudo -u teabot -H bash -lc 'cd /opt/tea-bot/frontend && npm ci && npm run build'
 ```
 
 Python 3.11+ is required. Ubuntu 22.04 already has it.
@@ -182,7 +363,7 @@ sudo systemctl status tea-bot
 sudo journalctl -u tea-bot -f
 ```
 
-Run a single polling process per token. The reminder scheduler lives in the same process.
+Run a single polling process per token. The reminder scheduler and, when `WEBAPP_SERVE=true`, the Mini App API live in the same process. Put the public `https://…/webapp/` URL in `.env` and in BotFather after nginx has a certificate.
 
 ### 5. Updates
 
@@ -190,6 +371,7 @@ Run a single polling process per token. The reminder scheduler lives in the same
 cd /opt/tea-bot
 sudo -u teabot git pull
 sudo -u teabot /opt/tea-bot/.venv/bin/pip install -r requirements.txt
+sudo -u teabot -H bash -lc 'cd /opt/tea-bot/frontend && npm ci && npm run build'
 sudo systemctl restart tea-bot
 ```
 
@@ -199,22 +381,30 @@ Keep `tea_shop.db`. It stores users, products, and orders.
 
 ```text
 .
-├── Example.env          # template, safe to commit
-├── .env                 # real secrets, never commit
+├── Example.env
+├── .env
 ├── requirements.txt
 ├── requirements-dev.txt
-├── pyproject.toml       # Ruff config
+├── pyproject.toml
 ├── README.md
-├── tea_shop.db          # created on first run
-└── app/
-    ├── bot.py           # polling, middleware, APScheduler
-    ├── config.py        # Settings from .env
-    ├── database.py      # engine, AsyncSession, session middleware
-    ├── models/          # SQLAlchemy models
-    ├── repositories/    # CRUD
-    ├── services/        # business use cases
-    ├── handlers/        # aiogram routers
-    └── keyboards/       # Reply and Inline keyboards
+├── tea_shop.db
+├── app/                 # Telegram bot
+│   ├── bot.py           # polling, Uvicorn, menu button
+│   ├── config.py
+│   ├── database.py      # shared engine and SessionMaker
+│   ├── models/          # shared SQLAlchemy models
+│   ├── repositories/
+│   ├── services/
+│   ├── handlers/
+│   └── keyboards/
+├── api/                 # FastAPI for the Mini App
+│   ├── main.py          # CORS, /webapp, /favicon.ico
+│   ├── deps.py          # session + Telegram initData
+│   ├── schemas.py
+│   └── routers/         # products, cart, orders
+└── frontend/            # React Mini App (Vite)
+    ├── src/
+    └── dist/            # created by npm run build
 ```
 
 ### models
@@ -259,7 +449,7 @@ Keyboard builders stay out of handlers so button labels and callback data stay i
 
 1. `/start` registers the user and can activate an admin invite.
 2. Unsubscribed users see **Subscribe** and **I subscribed**.
-3. Main menu: **Catalog**, **Cart**, **My orders**, **Contact admin**.
+3. Main menu: **Открыть витрину** (Mini App), **Catalog**, **Cart**, **My orders**, **Contact admin**. The menu button **Витрина** opens the same Web App.
 4. Catalog is a photo carousel with previous / next, composition, and add-to-cart.
 5. Cart supports plus/minus, clear, and checkout. Quantity edits update the same message.
 6. Checkout collects full name, phone, country (Russia), city, and street address.
@@ -307,4 +497,6 @@ Admins must send `/start` at least once, otherwise Telegram will not deliver bot
 - The bot must be a channel administrator.
 - One polling process per token.
 - Reminder jobs live in process memory and are rebuilt from open carts on startup.
+- Mini App `WEBAPP_URL` must be `https://…/webapp/`. Both `/webapp` and `/webapp/` serve the app without a redirect (a 307 used to drop Telegram `initData`).
+- After changing the tunnel or domain, update `.env`, BotFather, restart the bot, and send `/start`.
 - For higher load, point `DATABASE_URL` at PostgreSQL. The repository layer does not have to change.
