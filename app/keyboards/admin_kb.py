@@ -4,10 +4,12 @@ from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from app.models.order import CANCELLABLE_ORDER_STATUSES, Order, OrderStatus
+from app.models.product import Product
 from app.models.user import User, UserRole
 from app.services.order_tracking import STATUS_RANK, status_title
 
 ORDERS_PAGE_SIZE = 5
+PRODUCTS_PAGE_SIZE = 5
 ORDER_LIST_ACTIVE = "active"
 ORDER_LIST_ARCHIVED = "archived"
 
@@ -27,6 +29,7 @@ TERMINAL_STATUSES = {
 def admin_panel_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Добавить товар", callback_data="adm:add")
+    builder.button(text="Редактировать товар", callback_data="adm:plist:0")
     builder.button(text="🟢 Активные заказы", callback_data=f"adm:list:{ORDER_LIST_ACTIVE}:0")
     builder.button(text="🏁 Завершенные и отмененные", callback_data=f"adm:list:{ORDER_LIST_ARCHIVED}:0")
     builder.adjust(1)
@@ -133,4 +136,55 @@ def admins_keyboard(admins: Sequence[User]) -> InlineKeyboardMarkup:
             )
     builder.adjust(1)
     builder.row(InlineKeyboardButton(text="Назад", callback_data="sadm:home"))
+    return builder.as_markup()
+
+
+def products_keyboard(
+    products: Sequence[Product],
+    page: int,
+    total_count: int,
+) -> InlineKeyboardMarkup:
+    total_pages = max(1, (total_count + PRODUCTS_PAGE_SIZE - 1) // PRODUCTS_PAGE_SIZE)
+    page = max(0, min(page, total_pages - 1))
+    builder = InlineKeyboardBuilder()
+    for product in products:
+        label = f"#{product.id} {product.name}"
+        if len(label) > 60:
+            label = f"{label[:59]}…"
+        builder.button(
+            text=label,
+            callback_data=f"adm:pshow:{page}:{product.id}",
+        )
+    builder.adjust(1)
+    nav: list[InlineKeyboardButton] = []
+    if page > 0:
+        nav.append(InlineKeyboardButton(text="« Назад", callback_data=f"adm:plist:{page - 1}"))
+    if page + 1 < total_pages:
+        nav.append(InlineKeyboardButton(text="Вперёд »", callback_data=f"adm:plist:{page + 1}"))
+    if nav:
+        builder.row(*nav)
+    builder.row(InlineKeyboardButton(text="В админ-панель", callback_data="adm:home"))
+    return builder.as_markup()
+
+
+def product_edit_keyboard(product_id: int, page: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Название", callback_data=f"adm:pe:name:{page}:{product_id}")
+    builder.button(text="Фото", callback_data=f"adm:pe:photo:{page}:{product_id}")
+    builder.button(text="Описание", callback_data=f"adm:pe:desc:{page}:{product_id}")
+    builder.button(text="Состав", callback_data=f"adm:pe:comp:{page}:{product_id}")
+    builder.button(text="Цена", callback_data=f"adm:pe:price:{page}:{product_id}")
+    builder.adjust(2)
+    builder.row(
+        InlineKeyboardButton(text="🗑 Удалить товар", callback_data=f"adm:pd:{page}:{product_id}"),
+    )
+    builder.row(InlineKeyboardButton(text="К списку товаров", callback_data=f"adm:plist:{page}"))
+    return builder.as_markup()
+
+
+def product_delete_keyboard(product_id: int, page: int) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Да, удалить", callback_data=f"adm:pdy:{page}:{product_id}")
+    builder.button(text="Отмена", callback_data=f"adm:pshow:{page}:{product_id}")
+    builder.adjust(1)
     return builder.as_markup()
