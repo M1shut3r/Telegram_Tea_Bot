@@ -39,9 +39,9 @@ async def _add_missing_order_columns(connection: Any) -> None:
 
 
 async def init_db() -> None:
-    from app.models import AdminInvite, Cart, Order, OrderItem, Product, User
+    from app.models import AdminInvite, Cart, Order, OrderItem, Product, ShopSetting, User
 
-    _ = (User, Product, Cart, Order, OrderItem, AdminInvite)
+    _ = (User, Product, Cart, Order, OrderItem, AdminInvite, ShopSetting)
     async with engine.connect() as connection:
         await connection.execute(text("PRAGMA journal_mode=WAL"))
         await connection.execute(text("PRAGMA busy_timeout=8000"))

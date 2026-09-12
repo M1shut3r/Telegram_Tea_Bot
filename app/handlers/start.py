@@ -6,11 +6,18 @@ from aiogram.types import CallbackQuery, Message
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.keyboards.user_kb import CONTACT_ADMIN_BUTTON, contact_admin_keyboard, main_menu, subscribe_keyboard
+from app.keyboards.user_kb import (
+    CONTACT_SUPPORT_BUTTON,
+    LEGACY_CONTACT_ADMIN_BUTTON,
+    contact_support_keyboard,
+    main_menu,
+    subscribe_keyboard,
+)
 from app.models.user import User, UserRole
 from app.repositories.users import UserRepository
 from app.services.admin_manager import INVITE_PREFIX, activate_invite
 from app.services.subscription import SubscriptionService
+from app.services.support_contact import get_support_contact
 
 router = Router()
 
@@ -73,17 +80,24 @@ async def handle_start(
         await send_subscribe_gate(message, bot)
 
 
-@router.message(StateFilter(default_state), F.text == CONTACT_ADMIN_BUTTON)
-async def handle_contact_admin(message: Message, session: AsyncSession, bot: Bot) -> None:
+@router.message(
+    StateFilter(default_state),
+    F.text.in_({CONTACT_SUPPORT_BUTTON, LEGACY_CONTACT_ADMIN_BUTTON}),
+)
+async def handle_contact_support(message: Message, session: AsyncSession, bot: Bot) -> None:
     if message.from_user is None:
         return
     user = await resolve_user(session, message.from_user.id, message.from_user.username)
     if not await has_shop_access(bot, user):
         await send_subscribe_gate(message, bot)
         return
+    contact = await get_support_contact(session)
+    if not contact.is_set or contact.url is None:
+        await message.answer("Контакт поддержки пока не назначен.")
+        return
     await message.answer(
-        "Нажмите кнопку ниже, чтобы написать главному администратору.",
-        reply_markup=contact_admin_keyboard(settings.super_admin_id),
+        "Нажмите кнопку ниже, чтобы написать в поддержку.",
+        reply_markup=contact_support_keyboard(contact.url),
     )
 
 

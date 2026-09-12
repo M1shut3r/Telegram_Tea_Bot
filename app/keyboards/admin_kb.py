@@ -40,7 +40,31 @@ def super_admin_keyboard() -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
     builder.button(text="Создать инвайт-ссылку", callback_data="sadm:invite")
     builder.button(text="Список админов", callback_data="sadm:admins")
+    builder.button(text="Контакт поддержки", callback_data="sadm:support")
     builder.adjust(1)
+    return builder.as_markup()
+
+
+def support_contact_keyboard(has_contact: bool) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    builder.button(text="Выбрать из команды", callback_data="sadm:spick")
+    builder.button(text="Указать вручную", callback_data="sadm:smanual")
+    if has_contact:
+        builder.button(text="Сбросить контакт", callback_data="sadm:sclear")
+    builder.adjust(1)
+    builder.row(InlineKeyboardButton(text="Назад", callback_data="sadm:home"))
+    return builder.as_markup()
+
+
+def support_pick_keyboard(admins: Sequence[User]) -> InlineKeyboardMarkup:
+    builder = InlineKeyboardBuilder()
+    for admin in admins:
+        label = f"@{admin.username}" if admin.username else str(admin.telegram_id)
+        if admin.role == UserRole.SUPER_ADMIN.value:
+            label = f"{label} — супер-админ"
+        builder.button(text=label, callback_data=f"sadm:sset:{admin.id}")
+    builder.adjust(1)
+    builder.row(InlineKeyboardButton(text="Назад", callback_data="sadm:support"))
     return builder.as_markup()
 
 

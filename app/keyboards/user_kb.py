@@ -18,7 +18,8 @@ from app.services.order_tracking import status_title
 CATALOG_BUTTON = "Каталог"
 CART_BUTTON = "Корзина"
 MY_ORDERS_BUTTON = "📦 Мои заказы"
-CONTACT_ADMIN_BUTTON = "📞 Связаться с админом"
+CONTACT_SUPPORT_BUTTON = "📞 Связаться с поддержкой"
+LEGACY_CONTACT_ADMIN_BUTTON = "📞 Связаться с админом"
 ADMIN_PANEL_BUTTON = "Админ-панель"
 SUPER_ADMIN_BUTTON = "Супер-админ"
 CANCEL_BUTTON = "Отмена"
@@ -39,7 +40,7 @@ def main_menu(role: str) -> ReplyKeyboardMarkup:
         KeyboardButton(text=CART_BUTTON),
     )
     builder.row(KeyboardButton(text=MY_ORDERS_BUTTON))
-    builder.row(KeyboardButton(text=CONTACT_ADMIN_BUTTON))
+    builder.row(KeyboardButton(text=CONTACT_SUPPORT_BUTTON))
     if role in {UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value}:
         builder.row(KeyboardButton(text=ADMIN_PANEL_BUTTON))
     if role == UserRole.SUPER_ADMIN.value:
@@ -65,9 +66,9 @@ def subscribe_keyboard(channel_url: str) -> InlineKeyboardMarkup:
     return builder.as_markup()
 
 
-def contact_admin_keyboard(admin_telegram_id: int) -> InlineKeyboardMarkup:
+def contact_support_keyboard(url: str) -> InlineKeyboardMarkup:
     builder = InlineKeyboardBuilder()
-    builder.button(text="Написать администратору", url=f"tg://user?id={admin_telegram_id}")
+    builder.button(text="Написать в поддержку", url=url)
     return builder.as_markup()
 
 
