@@ -745,4 +745,5 @@ Admins must send `/start` at least once, otherwise Telegram will not deliver bot
 - Reminder jobs live in process memory and are rebuilt from open carts on startup.
 - Mini App `WEBAPP_URL` must be `https://…/webapp/`. Both `/webapp` and `/webapp/` serve the app without a redirect (a 307 used to drop Telegram `initData`).
 - After changing the tunnel or domain, update `.env`, BotFather, restart the bot, and send `/start`.
+- Product photos are stored as Telegram `file_id`, which works only in the bot that received the photo. After switching to a new bot token, the catalog re-uploads photos cached by the Mini App and saves the new ids. Products without a cached copy show a text card until an admin sends the photo again (**Админ-панель** → **Редактировать товар** → **Фото**). Add the new bot as a channel administrator, otherwise the subscription check fails for regular users.
 - For higher load, point `DATABASE_URL` at PostgreSQL. The repository layer does not have to change.

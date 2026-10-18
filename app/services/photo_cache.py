@@ -41,6 +41,20 @@ def _read_cached(file_id: str) -> FileResponse | None:
     return FileResponse(body_path, media_type=media_type, headers=_CACHE_HEADERS)
 
 
+def read_cached_photo(file_id: str) -> tuple[bytes, str] | None:
+    body_path, type_path = _cache_paths(file_id)
+    if not body_path.is_file():
+        return None
+    media_type = "image/jpeg"
+    if type_path.is_file():
+        media_type = type_path.read_text(encoding="utf-8").strip() or media_type
+    return body_path.read_bytes(), media_type
+
+
+def store_cached_photo(file_id: str, content: bytes, media_type: str) -> None:
+    _write_cached(file_id, content, media_type)
+
+
 def _write_cached(file_id: str, content: bytes, media_type: str) -> None:
     _CACHE_DIR.mkdir(parents=True, exist_ok=True)
     body_path, type_path = _cache_paths(file_id)

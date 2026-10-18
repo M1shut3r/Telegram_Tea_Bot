@@ -32,6 +32,7 @@ from app.services.admin_manager import HasRole
 from app.services.order_management import OrderNotCancellableError, OrderNotFoundError, cancel_order
 from app.services.order_tracking import user_status_notification
 from app.services.ordering import build_order_message, format_price
+from app.services.product_photo import answer_product_card, is_not_modified
 
 router = Router()
 router.message.filter(HasRole(UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value))
@@ -132,10 +133,11 @@ async def _delete_callback_message(callback: CallbackQuery) -> None:
 
 
 async def send_admin_product_card(message: Message, product: Product, page: int) -> None:
-    await message.answer_photo(
-        photo=product.photo_id,
-        caption=admin_product_caption(product),
-        reply_markup=product_edit_keyboard(product.id, page),
+    await answer_product_card(
+        message,
+        product,
+        admin_product_caption(product),
+        product_edit_keyboard(product.id, page),
     )
 
 
@@ -151,13 +153,9 @@ async def show_admin_product_card(callback: CallbackQuery, product: Product, pag
                 reply_markup=markup,
             )
             return
-        except TelegramBadRequest:
-            pass
-        try:
-            await callback.message.edit_caption(caption=caption, reply_markup=markup)
-            return
-        except TelegramBadRequest:
-            pass
+        except TelegramBadRequest as error:
+            if is_not_modified(error):
+                return
     await _delete_callback_message(callback)
     await send_admin_product_card(callback.message, product, page)
 

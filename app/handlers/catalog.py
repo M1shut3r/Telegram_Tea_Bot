@@ -12,6 +12,7 @@ from app.keyboards.user_kb import CATALOG_BUTTON, carousel_keyboard
 from app.models.product import Product
 from app.repositories.products import ProductRepository
 from app.services.ordering import format_price
+from app.services.product_photo import answer_product_card, is_not_modified
 
 router = Router()
 
@@ -26,11 +27,18 @@ def product_caption(product: Product, show_composition: bool) -> str:
     return f"<b>{name}</b>\n\n{body}\n\nЦена: {price}"
 
 
-async def send_carousel_card(message: Message, product: Product, index: int, total: int) -> None:
-    await message.answer_photo(
-        photo=product.photo_id,
-        caption=product_caption(product, False),
-        reply_markup=carousel_keyboard(product.id, index, total, False),
+async def send_carousel_card(
+    message: Message,
+    product: Product,
+    index: int,
+    total: int,
+    show_composition: bool = False,
+) -> None:
+    await answer_product_card(
+        message,
+        product,
+        product_caption(product, show_composition),
+        carousel_keyboard(product.id, index, total, show_composition),
     )
 
 
@@ -41,28 +49,35 @@ async def edit_carousel_card(
     total: int,
     show_composition: bool,
 ) -> None:
-    if callback.message is None:
+    message = callback.message
+    if message is None:
         return
     caption = product_caption(product, show_composition)
     markup = carousel_keyboard(product.id, index, total, show_composition)
-    current_caption = callback.message.html_text or callback.message.caption or ""
-    current_photo = callback.message.photo[-1].file_id if callback.message.photo else None
-    if current_photo == product.photo_id and current_caption == caption:
+    current_photo = message.photo[-1].file_id if message.photo else None
+    if current_photo is not None:
+        current_caption = message.html_text or message.caption or ""
         try:
-            await callback.message.edit_reply_markup(reply_markup=markup)
-        except TelegramBadRequest:
+            if current_photo != product.photo_id:
+                await message.edit_media(
+                    media=InputMediaPhoto(media=product.photo_id, caption=caption, parse_mode="HTML"),
+                    reply_markup=markup,
+                )
+            elif current_caption != caption:
+                await message.edit_caption(caption=caption, reply_markup=markup)
+            else:
+                await message.edit_reply_markup(reply_markup=markup)
             return
-        return
+        except TelegramBadRequest as error:
+            if is_not_modified(error):
+                return
+    # A text card (its photo was unavailable) cannot be edited into a photo, and edit_media
+    # fails when this bot cannot use the stored photo id. Replace the card instead.
     try:
-        if current_photo == product.photo_id:
-            await callback.message.edit_caption(caption=caption, reply_markup=markup)
-            return
-        await callback.message.edit_media(
-            media=InputMediaPhoto(media=product.photo_id, caption=caption, parse_mode="HTML"),
-            reply_markup=markup,
-        )
+        await message.delete()
     except TelegramBadRequest:
-        return
+        pass
+    await send_carousel_card(message, product, index, total, show_composition)
 
 
 @router.message(StateFilter(default_state), F.text == CATALOG_BUTTON)
