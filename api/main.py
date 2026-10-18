@@ -108,13 +108,17 @@ def _index_response() -> FileResponse:
     return FileResponse(INDEX_FILE)
 
 
-@app.get("/webapp")
-@app.get("/webapp/")
+# FastAPI does not add HEAD to GET routes, so `curl -I` and uptime checks got 405.
+_PAGE_METHODS = ["GET", "HEAD"]
+
+
+@app.api_route("/webapp", methods=_PAGE_METHODS, include_in_schema=False)
+@app.api_route("/webapp/", methods=_PAGE_METHODS, include_in_schema=False)
 async def webapp_index() -> FileResponse:
     return _index_response()
 
 
-@app.get("/webapp/{asset_path:path}")
+@app.api_route("/webapp/{asset_path:path}", methods=_PAGE_METHODS, include_in_schema=False)
 async def webapp_asset(asset_path: str) -> FileResponse:
     existing = _safe_frontend_file(asset_path)
     if existing is not None:

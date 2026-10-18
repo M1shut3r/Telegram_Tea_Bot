@@ -178,8 +178,10 @@ winget install --id Cloudflare.cloudflared
 Open a **second** PowerShell window. If QUIC is blocked (common on home routers), use HTTP/2:
 
 ```powershell
-cloudflared tunnel --url http://127.0.0.1:8000 --protocol http2 --loglevel fatal
+cloudflared tunnel --url http://127.0.0.1:8000 --protocol http2
 ```
+
+Do not add `--loglevel fatal`: cloudflared prints the tunnel URL at `info` level, so that flag hides it.
 
 Wait for the box:
 
@@ -225,7 +227,7 @@ Then in the bot chat send `/start` so the reply keyboard refreshes. Open the sto
 
 | Method | Path | Auth |
 | --- | --- | --- |
-| `GET` | `/webapp/`, `/webapp` | public (React app) |
+| `GET`, `HEAD` | `/webapp/`, `/webapp` | public (React app) |
 | `GET` | `/api/products` | public |
 | `GET` | `/api/products/{id}/photo` | public (proxies the Telegram file) |
 | `GET` | `/api/cart` | Telegram `initData` |
@@ -448,8 +450,10 @@ screen -ls
 
 ```bash
 screen -S tea-site
-cloudflared tunnel --url http://127.0.0.1:8000 --protocol http2 --loglevel fatal
+cloudflared tunnel --url http://127.0.0.1:8000 --protocol http2 2>&1 | tee ~/tea-tunnel.log
 ```
+
+Не добавляйте `--loglevel fatal`: адрес туннеля cloudflared печатает на уровне `info`, и с этим флагом он не появится.
 
 Дождитесь блока:
 
@@ -459,6 +463,12 @@ https://случайные-слова.trycloudflare.com
 ```
 
 Скопируйте `https://….trycloudflare.com` **без** пути в конце. Отсоединитесь: **`Ctrl+A`, затем `D`**. Это окно нельзя «убивать»: новый запуск cloudflared выдаёт **другой** хост.
+
+Текущий хост можно посмотреть и не заходя в screen — лог пишется в `~/tea-tunnel.log`:
+
+```bash
+grep -oE 'https://[a-z0-9]+(-[a-z0-9]+)+\.trycloudflare\.com' ~/tea-tunnel.log | tail -1
+```
 
 Если видите `Failed to dial a quic connection` — команда с `--protocol http2` уже правильная. Если туннель сразу падает, проверьте, что `tea-bot` запущен и отвечает:
 
@@ -553,6 +563,17 @@ screen -r tea-bot
 Screen `tea-site` после `git pull` не перезапускайте, если хост туннеля тот же.
 
 После перезагрузки VPS screen-сессии пропадут. Зайдите по SSH и повторите шаги 12–13 (и 14, если cloudflared выдал новый хост — тогда обновите `.env` и BotFather).
+
+#### Витрина перестала открываться
+
+`ERR_NAME_NOT_RESOLVED` или «не удалось найти IP-адрес сервера» при открытии витрины значит, что хоста из `WEBAPP_URL` больше нет. Быстрый туннель живёт, пока жив процесс `cloudflared`. После его падения, перезапуска или перезагрузки VPS хост другой, а бот всё ещё отдаёт старый. Много красных строк в `tea-site` — признак того, что cloudflared терял связь с Cloudflare.
+
+1. Бот и сайт живы: `curl -I http://127.0.0.1:8000/webapp/` отвечает `200`.
+2. Перезапустите туннель по шагу 13 и возьмите новый хост.
+3. Повторите шаги 14–15: новый `WEBAPP_URL`, перезапуск `tea-bot`, **Main App** и **Domain** в BotFather.
+4. Отправьте боту `/start`: в старых сообщениях кнопка хранит старый адрес.
+
+Чтобы хост больше не менялся, переходите на свой домен (шаг 17).
 
 ### 17. Вариант: свой домен вместо туннеля
 
