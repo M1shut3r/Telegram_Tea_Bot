@@ -3,6 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.client.session.aiohttp import AiohttpSession
+from aiogram.exceptions import TelegramAPIError
 from aiogram.fsm.storage.memory import MemoryStorage
 from aiogram.types import MenuButtonWebApp, WebAppInfo
 from aiogram.utils.backoff import BackoffConfig
@@ -16,6 +17,7 @@ from app.handlers.orders import router as orders_router
 from app.handlers.start import router as start_router
 from app.handlers.super_admin import router as super_admin_router
 from app.services.cart_lifecycle import cart_scheduler, restore_cart_jobs
+from app.services.subscription import SubscriptionService
 
 _SILENCED_LOGGERS = (
     "uvicorn",
@@ -61,6 +63,30 @@ def _telegram_session() -> AiohttpSession:
     return session
 
 
+async def _check_channel_setup(bot: Bot) -> None:
+    """Tell the super admin right away if the subscription channel is misconfigured.
+
+    Logs are off by default (LOG_LEVEL=critical), so a direct message is the only signal
+    that would otherwise reach anyone.
+    """
+    service = SubscriptionService(bot, settings.channel_id, settings.channel_url)
+    try:
+        problems = await service.diagnose()
+    except Exception:
+        # A diagnostic must never stop the bot from starting.
+        logging.exception("Channel setup check failed")
+        return
+    if not problems:
+        return
+    for problem in problems:
+        logging.error("Channel setup: %s", problem)
+    text = "⚠️ Проверка подписки на канал настроена неверно:\n\n" + "\n\n".join(f"• {item}" for item in problems)
+    try:
+        await bot.send_message(settings.super_admin_id, text, parse_mode=None)
+    except TelegramAPIError as error:
+        logging.error("Could not notify the super admin about the channel setup: %s", error)
+
+
 async def _start_polling(dispatcher: Dispatcher, bot: Bot) -> None:
     await dispatcher.start_polling(
         bot,
@@ -92,6 +118,7 @@ async def main() -> None:
         await bot.set_chat_menu_button(
             menu_button=MenuButtonWebApp(text="Витрина", web_app=WebAppInfo(url=webapp_url)),
         )
+    await _check_channel_setup(bot)
     cart_scheduler.start()
     await restore_cart_jobs(bot)
     try:

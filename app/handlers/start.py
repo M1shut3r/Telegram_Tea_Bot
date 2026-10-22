@@ -31,20 +31,26 @@ async def resolve_user(
     return await repository.upsert(telegram_id, username, settings.super_admin_id)
 
 
+def subscription_service(bot: Bot) -> SubscriptionService:
+    return SubscriptionService(bot, settings.channel_id, settings.channel_url)
+
+
 async def has_shop_access(bot: Bot, user: User) -> bool:
     if user.role in {UserRole.ADMIN.value, UserRole.SUPER_ADMIN.value}:
         return True
-    service = SubscriptionService(bot, settings.channel_id)
-    return await service.is_subscribed(user.telegram_id)
+    return await subscription_service(bot).is_subscribed(user.telegram_id)
 
 
 async def send_subscribe_gate(message: Message, bot: Bot) -> None:
-    service = SubscriptionService(bot, settings.channel_id)
-    url = await service.channel_url()
-    await message.answer(
-        "Чтобы пользоваться витриной, подпишитесь на наш канал и нажмите «Я подписался».",
-        reply_markup=subscribe_keyboard(url),
-    )
+    url = await subscription_service(bot).channel_url()
+    if url is None:
+        text = (
+            "Чтобы пользоваться витриной, нужно подписаться на наш канал, "
+            "но ссылка на него сейчас недоступна. Попробуйте позже или напишите в поддержку."
+        )
+    else:
+        text = "Чтобы пользоваться витриной, подпишитесь на наш канал и нажмите «Я подписался»."
+    await message.answer(text, reply_markup=subscribe_keyboard(url))
 
 
 async def send_home(message: Message, user: User, text: str = "Добро пожаловать в чайную витрину.") -> None:
@@ -116,14 +122,3 @@ async def handle_subscription_check(
         return
     await callback.answer("Доступ открыт.")
     await callback.message.answer("Спасибо за подписку!", reply_markup=main_menu(user.role))
-
-
-@router.message(F.web_app_data)
-async def handle_web_app_data(message: Message, session: AsyncSession, bot: Bot) -> None:
-    if message.from_user is None or message.web_app_data is None:
-        return
-    user = await resolve_user(session, message.from_user.id, message.from_user.username)
-    if not await has_shop_access(bot, user):
-        await send_subscribe_gate(message, bot)
-        return
-    await send_home(message, user, "Данные витрины получены.")

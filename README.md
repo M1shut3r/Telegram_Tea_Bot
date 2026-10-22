@@ -33,7 +33,7 @@ The project uses a layered layout: handlers never talk to SQL, repositories stay
 ### 1. Telegram
 
 1. Create a bot with [@BotFather](https://t.me/BotFather) and copy the token.
-2. Create a channel (or reuse one). Add the bot as an administrator with permission to see members, otherwise `get_chat_member` will fail.
+2. Create a channel (or reuse one). Add the bot as an administrator, otherwise `get_chat_member` fails and nobody passes the subscription check. For a private channel also allow **Add subscribers** (invite users), so the bot can give out an invite link.
 3. Get the numeric channel ID (`-100...`). That value belongs in `.env`.
 4. Get your Telegram user ID (for example via `@userinfobot`). That value is `SUPER_ADMIN_ID`.
 
@@ -91,6 +91,7 @@ cp Example.env .env
 BOT_TOKEN=123456:ABC-DEF
 SUPER_ADMIN_ID=123456789
 CHANNEL_ID=-1001234567890
+CHANNEL_URL=
 WEBAPP_URL=
 WEBAPP_HOST=0.0.0.0
 WEBAPP_PORT=8000
@@ -101,7 +102,8 @@ LOG_LEVEL=critical
 
 - `BOT_TOKEN` — token from BotFather.
 - `SUPER_ADMIN_ID` — your Telegram ID. The first `/start` from this user grants `super_admin`.
-- `CHANNEL_ID` — numeric channel ID, including the leading minus.
+- `CHANNEL_ID` — numeric channel ID, including the leading minus. `-1001234567890` is only the example value: the bot refuses it and tells the super admin at startup.
+- `CHANNEL_URL` — optional link for the **Подписаться на канал** button (`https://t.me/name`, `@name` or an invite link `https://t.me/+…`). Leave empty to take the link from the channel itself.
 - `WEBAPP_URL` — public **https** URL of the Mini App, including `/webapp/`. Leave empty until the site is reachable over HTTPS. Telegram rejects `http://` and placeholders like `yourdomain.com`.
 - `WEBAPP_HOST` / `WEBAPP_PORT` — where FastAPI listens. Default is `0.0.0.0:8000`.
 - `WEBAPP_SERVE` — `true` starts FastAPI inside the same process as the bot (`python -m app.bot`).
@@ -120,7 +122,9 @@ python -m app.bot
 
 Write `/start` to the bot in Telegram. `tea_shop.db` is created automatically.
 
-The chat catalog and cart work without the Mini App. The reply button **Открыть витрину** appears only after `WEBAPP_URL` is a real `https://` address.
+The chat catalog and cart work without the Mini App. The Telegram menu button **Витрина** appears only after `WEBAPP_URL` is a real `https://` address.
+
+On startup the bot checks the channel from `CHANNEL_ID`. If the ID is wrong, the bot is not a channel admin, or it cannot get an invite link, the super admin receives a message describing what to fix.
 
 ## Telegram Mini App (the website)
 
@@ -221,7 +225,7 @@ https://random-words.trycloudflare.com/webapp/
 
 On startup the bot also calls `set_chat_menu_button`, so a **Витрина** button appears next to the message field.
 
-Then in the bot chat send `/start` so the reply keyboard refreshes. Open the storefront from **Витрина** or **Открыть витрину**, not by pasting the Cloudflare link into a normal browser. A regular browser has no Telegram `initData`; the catalog can still load, but cart and checkout need a real Mini App session.
+Then in the bot chat send `/start` so the reply keyboard refreshes. Open the storefront from **Витрина**, not by pasting the Cloudflare link into a normal browser. A regular browser has no Telegram `initData`; the catalog can still load, but cart and checkout need a real Mini App session.
 
 ### API routes
 
@@ -388,6 +392,7 @@ nano .env
 BOT_TOKEN=123456:ABC-DEF
 SUPER_ADMIN_ID=123456789
 CHANNEL_ID=-1001234567890
+CHANNEL_URL=
 WEBAPP_URL=https://203-0-113-10.sslip.io/webapp/
 WEBAPP_HOST=127.0.0.1
 WEBAPP_PORT=8000
@@ -396,6 +401,8 @@ WEBAPP_DEBUG=false
 LOG_LEVEL=critical
 ```
 
+- `CHANNEL_ID` — числовой ID **вашего** канала. `-1001234567890` — только пример: с ним бот при запуске пришлёт супер-админу предупреждение.
+- `CHANNEL_URL` — необязательно. Ссылка для кнопки «Подписаться на канал» (`https://t.me/имя`, `@имя` или приглашение `https://t.me/+…`). Если пусто, бот берёт ссылку из самого канала.
 - `WEBAPP_URL` — ваш адрес из шага 0 с `https://` в начале и `/webapp/` в конце. Слеш в конце обязателен.
 - `WEBAPP_HOST=127.0.0.1` — сайт слушает только локально. Снаружи к нему ходит nginx, порт 8000 в интернет не открывается.
 
@@ -509,7 +516,7 @@ certbot спросит почту для уведомлений, согласи�
 
 Кнопку меню **Витрина** бот выставляет сам при каждом запуске из `WEBAPP_URL`.
 
-В чате с ботом отправьте `/start`. Витрину открывайте кнопками **Витрина** или **Открыть витрину**, не вставкой ссылки в обычный браузер: там нет `initData`, корзина не заработает.
+В чате с ботом отправьте `/start`. Витрину открывайте кнопкой **Витрина** рядом с полем ввода, не вставкой ссылки в обычный браузер: там нет `initData`, корзина не заработает.
 
 ### 14. Повседневные команды
 
@@ -552,6 +559,7 @@ sudo systemctl restart tea-bot
 | `Could not find a profile matching 'Nginx Full'` | nginx не установился | Шаг 3 |
 | Вместо фото товара буква **Ж** или «Фото временно недоступно» | Фото добавлены через другой бот (сменился токен) | `python -m app.tools.recover_photos`, см. [Operations](#operations) |
 | Бот не видит подписку на канал | Новый бот не админ канала | Добавьте бота администратором канала |
+| Кнопка «Подписаться на канал» ведёт не туда или её нет | Неверный `CHANNEL_ID` в `.env`, бот не в канале, или у закрытого канала боту не дали права приглашать | Смотрите сообщение, которое бот присылает супер-админу при запуске. Можно задать ссылку вручную в `CHANNEL_URL` |
 
 ### 16. Временный вариант: быстрый туннель Cloudflare
 
@@ -625,7 +633,7 @@ Async SQLAlchemy 2.0 CRUD. The base class covers `get`, `create` (`insert`), `up
 
 ### services
 
-- `subscription.py` — `get_chat_member` for `CHANNEL_ID` and a channel URL.
+- `subscription.py` — `get_chat_member` for `CHANNEL_ID`, the channel link (`CHANNEL_URL`, public username or the bot's invite link, cached for 10 minutes) and the startup self-check.
 - `cart_lifecycle.py` — 2h / 12h / 24h jobs, cancel on checkout or manual clear, restore after restart.
 - `ordering.py` — totals, `Order` + `OrderItems`, admin broadcast, first customer notification.
 - `order_tracking.py` — status titles, customer notifications, roadmap text.
@@ -650,7 +658,7 @@ Keyboard builders stay out of handlers so button labels and callback data stay i
 
 1. `/start` registers the user and can activate an admin invite.
 2. Unsubscribed users see **Subscribe** and **I subscribed**.
-3. Main menu: **Открыть витрину** (Mini App), **Catalog**, **Cart**, **My orders**, **Contact admin**. The menu button **Витрина** opens the same Web App.
+3. Main menu: **Catalog**, **Cart**, **My orders**, **Contact support**. The Mini App opens from Telegram's own menu button **Витрина** next to the message field.
 4. Catalog is a photo carousel with previous / next, composition, and add-to-cart.
 5. Cart supports plus/minus, clear, and checkout. Quantity edits update the same message.
 6. Checkout collects full name, phone, country (Russia), city, and street address.

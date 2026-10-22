@@ -16,6 +16,9 @@ class Settings(BaseSettings):
     bot_token: str
     super_admin_id: int
     channel_id: int
+    # Optional explicit link for the «Подписаться» button (https://t.me/name or @name).
+    # When empty, the link is taken from the channel itself.
+    channel_url: str = ""
     database_url: str = f"sqlite+aiosqlite:///{_DB_PATH}"
     webapp_url: str = ""
     webapp_host: str = "0.0.0.0"
