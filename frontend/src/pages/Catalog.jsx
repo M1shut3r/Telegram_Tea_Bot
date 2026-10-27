@@ -1,14 +1,18 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import WebApp from '@twa-dev/sdk'
 import { fetchProducts, getErrorMessage } from '../api/client'
 import { getTelegramInitData } from '../telegram'
-import MaisonHeader from '../components/MaisonHeader'
+import { ChevronRightIcon } from '../components/Icons'
+import PageHeader from '../components/PageHeader'
 import ProductCard from '../components/ProductCard'
 import ProductModal from '../components/ProductModal'
 import { useCart } from '../context/CartContext'
-import WebApp from '@twa-dev/sdk'
+import { formatPacks, formatPrice, pluralize } from '../utils/format'
 
 export default function Catalog() {
-  const { add, setQuantity, items } = useCart()
+  const navigate = useNavigate()
+  const { add, setQuantity, items, count, total } = useCart()
   const [products, setProducts] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -69,24 +73,40 @@ export default function Catalog() {
     }
   }
 
+  const closeSheet = useCallback(() => setSelected(null), [])
+
+  const goToCart = useCallback(() => {
+    setSelected(null)
+    navigate('/cart')
+  }, [navigate])
+
   return (
-    <main className="px-5 pt-6">
-      <MaisonHeader kicker="Чайная" title="Витрина">
-        Ночная витрина. Выбирайте спокойно.
-      </MaisonHeader>
+    <main className={['px-4 pt-5', count > 0 ? 'pb-[4.75rem]' : ''].join(' ')}>
+      <PageHeader variant="emblem" />
+
+      <div className="mb-4 mt-5 flex items-baseline justify-between">
+        <h1 className="font-display text-[1.875rem] leading-tight">Витрина</h1>
+        {products.length > 0 ? (
+          <span className="text-sm text-cream-soft">
+            {products.length} {pluralize(products.length, ['сорт', 'сорта', 'сортов'])}
+          </span>
+        ) : null}
+      </div>
+
       {loading ? (
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-2 gap-3" aria-busy="true" aria-label="Загружаем витрину">
           {Array.from({ length: 4 }).map((_, index) => (
-            <div key={index} className="h-80 animate-pulse bg-paper-deep" />
+            <div key={index} className="lk-skeleton h-80" />
           ))}
         </div>
       ) : null}
-      {error ? <p className="maison-card px-4 py-5 text-center text-sm text-tg-hint">{error}</p> : null}
+
+      {error ? <p className="lk-card px-4 py-5 text-center text-sm text-cream-soft">{error}</p> : null}
+
       {!loading && !error && products.length === 0 ? (
-        <p className="maison-card px-4 py-10 text-center text-sm font-light text-tg-hint">
-          Каталог пока пуст. Загляните позже.
-        </p>
+        <p className="lk-card px-4 py-10 text-center text-sm text-cream-soft">Каталог пока пуст. Загляните позже.</p>
       ) : null}
+
       <div className="grid grid-cols-2 gap-3">
         {products.map((product) => (
           <ProductCard
@@ -100,14 +120,33 @@ export default function Catalog() {
           />
         ))}
       </div>
+
       <ProductModal
         product={selected}
         quantity={selected ? quantityOf(selected.id) : 0}
         busy={selected != null && pendingId === selected.id}
-        onClose={() => setSelected(null)}
+        onClose={closeSheet}
+        onGoToCart={goToCart}
         onIncrement={handleIncrement}
         onDecrement={handleDecrement}
       />
+
+      {count > 0 ? (
+        <div className="lk-cart-bar">
+          <Link
+            to="/cart"
+            className="flex min-h-[3.25rem] items-center justify-between rounded-[0.875rem] bg-gold px-4 text-[0.95rem] font-extrabold text-lacquer no-underline"
+          >
+            <span>
+              {formatPacks(count)} · {formatPrice(total)}
+            </span>
+            <span className="flex items-center gap-1">
+              Корзина
+              <ChevronRightIcon />
+            </span>
+          </Link>
+        </div>
+      ) : null}
     </main>
   )
 }

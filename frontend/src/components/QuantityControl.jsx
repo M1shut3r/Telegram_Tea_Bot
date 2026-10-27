@@ -1,36 +1,36 @@
-export default function QuantityControl({ quantity, busy, onIncrement, onDecrement, tall = false }) {
-  const height = tall ? 'h-[3.25rem]' : 'h-11'
+import { MinusIcon, PlusIcon } from './Icons'
+
+// 0 шт. — красная кнопка «В корзину», иначе — золотой степпер «− N шт. +».
+export default function QuantityControl({
+  quantity,
+  busy,
+  onIncrement,
+  onDecrement,
+  name = '',
+  tall = false,
+  addLabel = 'В корзину',
+}) {
+  const height = tall ? 'min-h-[3.25rem]' : 'min-h-[2.75rem]'
 
   if (quantity <= 0) {
     return (
-      <button type="button" disabled={busy} onClick={onIncrement} className={`maison-btn ${height} text-[0.68rem]`}>
-        В корзину
+      <button type="button" disabled={busy} onClick={onIncrement} className={`lk-btn ${height} text-[0.95rem]`}>
+        {addLabel}
       </button>
     )
   }
 
+  const suffix = name ? ` «${name}»` : ''
   return (
-    <div
-      className={`flex w-full items-center justify-between border border-white/10 bg-forest px-1 text-cream ${height}`}
-    >
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onDecrement}
-        className="flex h-11 w-11 items-center justify-center text-xl disabled:opacity-60"
-      >
-        −
+    <div className={`lk-stepper ${height}`}>
+      <button type="button" disabled={busy} onClick={onDecrement} aria-label={`Убрать одну пачку${suffix}`}>
+        <MinusIcon />
       </button>
-      <span className="min-w-[1.5rem] text-center text-[11px] font-medium uppercase tracking-[0.16em]">
-        {quantity} шт
+      <span className="text-[0.95rem] font-extrabold" aria-live="polite">
+        {quantity} шт.
       </span>
-      <button
-        type="button"
-        disabled={busy}
-        onClick={onIncrement}
-        className="flex h-11 w-11 items-center justify-center text-xl disabled:opacity-60"
-      >
-        +
+      <button type="button" disabled={busy} onClick={onIncrement} aria-label={`Добавить пачку${suffix}`}>
+        <PlusIcon />
       </button>
     </div>
   )

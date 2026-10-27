@@ -72,13 +72,13 @@ export function bootTelegram() {
   const webApp = getTelegramWebApp()
   applyFullsize(webApp)
   if (typeof webApp.setHeaderColor === 'function') {
-    webApp.setHeaderColor('#0b0c10')
+    webApp.setHeaderColor('#140e0b')
   }
   if (typeof webApp.setBackgroundColor === 'function') {
-    webApp.setBackgroundColor('#0b0c10')
+    webApp.setBackgroundColor('#140e0b')
   }
   if (typeof webApp.setBottomBarColor === 'function') {
-    webApp.setBottomBarColor('#0b0c10')
+    webApp.setBottomBarColor('#0b0806')
   }
   if (typeof webApp.onEvent === 'function') {
     webApp.onEvent('viewportChanged', () => applyFullsize(webApp))

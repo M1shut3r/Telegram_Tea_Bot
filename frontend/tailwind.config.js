@@ -3,23 +3,34 @@ export default {
   theme: {
     extend: {
       colors: {
-        paper: {
-          DEFAULT: '#0b0c10',
-          deep: '#181a21',
-        },
-        cream: '#d7dbe3',
-        ink: '#e6e8ee',
-        forest: {
-          DEFAULT: '#1c1f27',
-          deep: '#07080b',
+        // «Чёрный лак»: чёрный лаковый фон, золото и киноварь, как на хохломе.
+        lacquer: {
+          DEFAULT: '#140e0b',
+          deep: '#0b0806',
+          panel: '#211813',
+          raised: '#2c211a',
+          line: '#3a2c20',
         },
         gold: {
-          DEFAULT: '#7dcec0',
-          soft: '#9ee0d4',
+          DEFAULT: '#dda94a',
+          bright: '#f0c46a',
+          leaf: '#c39340',
+          field: '#a07c3e',
+          muted: '#8a6a35',
         },
-        neon: '#67e8c8',
-        night: '#0b0c10',
-        panel: '#15171d',
+        cinnabar: {
+          DEFAULT: '#b8321f',
+          bright: '#d6452e',
+        },
+        cream: {
+          DEFAULT: '#f5ebdd',
+          paper: '#f4ecdf',
+          soft: '#bfa98c',
+          dim: '#a8957a',
+          muted: '#cdbba3',
+        },
+        sage: '#9cc28a',
+        danger: '#f08a73',
         tg: {
           bg: 'var(--tg-theme-bg-color)',
           text: 'var(--tg-theme-text-color)',
@@ -31,15 +42,11 @@ export default {
         },
       },
       fontFamily: {
-        sans: ['Outfit', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        serif: ['Outfit', 'ui-sans-serif', 'system-ui', 'sans-serif'],
-        neon: ['"Russo One"', 'Outfit', 'sans-serif'],
-      },
-      boxShadow: {
-        card: '0 18px 40px rgba(0, 0, 0, 0.28)',
+        sans: ['Nunito', 'ui-sans-serif', 'system-ui', 'sans-serif'],
+        display: ['"Yeseva One"', 'Georgia', 'serif'],
       },
       letterSpacing: {
-        maison: '0.28em',
+        kicker: '0.18em',
       },
     },
   },

@@ -10,9 +10,9 @@ export default function App() {
   const hideNav = location.pathname === '/checkout'
 
   return (
-    <div className="tg-shell text-ink">
+    <div className="tg-shell text-cream">
       <div className="tg-scroll">
-        <div className={hideNav ? '' : 'pb-32'}>
+        <div className={hideNav ? '' : 'pb-[calc(var(--dock-height)+var(--safe-bottom)+1.5rem)]'}>
           <Routes>
             <Route path="/" element={<Catalog />} />
             <Route path="/cart" element={<Cart />} />

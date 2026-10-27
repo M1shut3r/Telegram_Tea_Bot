@@ -10,6 +10,22 @@ export function formatPrice(value) {
   }).format(number)
 }
 
+export function pluralize(count, [one, few, many]) {
+  const n = Math.abs(Number(count)) % 100
+  const n10 = n % 10
+  if (n10 === 1 && n !== 11) {
+    return one
+  }
+  if (n10 >= 2 && n10 <= 4 && (n < 12 || n > 14)) {
+    return few
+  }
+  return many
+}
+
+export function formatPacks(count) {
+  return `${count} ${pluralize(count, ['пачка', 'пачки', 'пачек'])}`
+}
+
 export function formatDate(value) {
   if (!value) {
     return ''
